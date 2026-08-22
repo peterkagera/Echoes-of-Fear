@@ -1,0 +1,3 @@
+[submodule "Assets/FunkyShaders"]
+	path = Assets/FunkyShaders
+	url = https://github.com/blewert/funky-unity-shaders.git
