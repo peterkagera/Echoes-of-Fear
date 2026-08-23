@@ -44,7 +44,7 @@ Material:
     - _RingWidth: 1
     m_Colors:
     - _LineColor: {r: 0.7843136, g: 3.215686, b: 0.7843136, a: 1}
-    - _PulseCenter: {r: -8.981967, g: 1.1799998, b: 4.809056, a: 0}
+    - _PulseCenter: {r: -6.410362, g: 1.18, b: 23.508387, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &3445890813778269050
