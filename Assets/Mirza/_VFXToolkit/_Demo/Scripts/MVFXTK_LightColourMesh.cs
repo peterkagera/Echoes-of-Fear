@@ -8,10 +8,10 @@ namespace Mirza.VFXToolKit
     [ExecuteAlways]
     public class MVFXTK_LightColourMesh : MonoBehaviour
     {
-        Light light;
+        new Light light;
         Material material;
 
-        Renderer renderer;
+        new Renderer renderer;
 
         public float intensityScale = 1.0f;
         public bool executeInEditMode;

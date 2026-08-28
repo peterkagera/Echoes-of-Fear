@@ -12,7 +12,7 @@ namespace Mirza.VFXToolKit
     [ExecuteAlways]
     public class MVFXTK_CameraCopyFrom : MonoBehaviour
     {
-        Camera camera;
+        new Camera camera;
         public Camera target;
 
         public float priorityOffset = -1;

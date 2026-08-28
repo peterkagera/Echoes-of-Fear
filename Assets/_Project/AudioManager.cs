@@ -42,9 +42,23 @@ public class AudioManager : MonoBehaviour
     public void PlayFootstep()
     {
         if (footstepSFXArray == null || footstepSFXArray.Length == 0 || footstepSource == null || footstepSource.isPlaying) return;
+
         AudioClip clip = footstepSFXArray[Random.Range(0, footstepSFXArray.Length)];
         footstepSource.pitch = Random.Range(0.85f, 1.15f);
         footstepSource.PlayOneShot(clip);
+
+        // Broadcast sound position to all active enemies in scene
+        GameObject playerObj = GameObject.FindWithTag("Player");
+        if (playerObj != null)
+        {
+            EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
+            float noiseRadius = 18f; // Distance sound carries
+
+            foreach (EnemyAI enemy in enemies)
+            {
+                enemy.AlertToSound(playerObj.transform.position, noiseRadius);
+            }
+        }
     }
 
     private void PlaySFX(AudioClip clip)

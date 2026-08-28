@@ -8,7 +8,7 @@ namespace Mirza.VFXToolKit
     {
         Material material;
 
-        public Vector2 animation = new(0.0f, 0.5f);
+        new public Vector2 animation = new(0.0f, 0.5f);
         public string propertyName = "_MainTex";
 
         [Space]

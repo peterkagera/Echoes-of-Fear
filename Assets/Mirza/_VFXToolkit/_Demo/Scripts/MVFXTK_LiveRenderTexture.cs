@@ -61,7 +61,7 @@ namespace Mirza.VFXToolKit
 
         [Space]
 
-        public Camera camera;
+        new public Camera camera;
 
         [Space]
 

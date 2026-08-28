@@ -15,7 +15,7 @@ namespace Mirza.VFXToolKit
     {
         public MVFXTK_LiveRenderTexture liveRenderTexture;
 
-        Renderer renderer;
+        new Renderer renderer;
         public string textureName = "_MainTex";
 
         void Update()
