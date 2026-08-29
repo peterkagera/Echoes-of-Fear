@@ -9,6 +9,12 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float lookSensitivity = 1.0f;
     [SerializeField] private float gravity = -9.81f;
 
+    [Header("Footstep Settings")]
+    [SerializeField] private float footstepInterval = 0.45f;
+    [Range(0f, 2f)]
+    [SerializeField] private float footstepVolume = 1.0f;
+    private float footstepTimer = 0f;
+
     [Header("References")]
     [SerializeField] private Transform cameraTransform;
 
@@ -25,6 +31,13 @@ public class PlayerController : MonoBehaviour
         Cursor.visible = false;
     }
 
+    private void Start()
+    {
+        // Reset movement values on Start to prevent initial frame physics launch
+        verticalVelocity = 0f;
+        moveInput = Vector2.zero;
+    }
+
     private void Update()
     {
         HandleLook();
@@ -33,7 +46,6 @@ public class PlayerController : MonoBehaviour
 
     public void OnMove(InputValue value)
     {
-        //AudioManager.Instance?.PlayFootstep();
         moveInput = value.Get<Vector2>();
     }
 
@@ -44,21 +56,50 @@ public class PlayerController : MonoBehaviour
 
     private void HandleMovement()
     {
-        if (controller.isGrounded && verticalVelocity < 0)
+        // Cap deltaTime to max 0.05s to prevent massive movement spikes during frame hitches
+        float safeDeltaTime = Mathf.Min(Time.deltaTime, 0.05f);
+
+        if (controller.isGrounded)
         {
-            verticalVelocity = -2f;
+            if (verticalVelocity < 0)
+            {
+                verticalVelocity = -2f;
+            }
         }
 
         Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
-        verticalVelocity += gravity * Time.deltaTime;
+        verticalVelocity += gravity * safeDeltaTime;
 
         Vector3 velocity = (move * moveSpeed) + (Vector3.up * verticalVelocity);
-        controller.Move(velocity * Time.deltaTime);
+        controller.Move(velocity * safeDeltaTime);
 
-        // Play footstep loop while moving on the ground
-        if (controller.isGrounded && moveInput.magnitude > 0.1f)
+        // Footstep timing check
+        if (controller.isGrounded && moveInput.sqrMagnitude > 0.01f)
         {
-            AudioManager.Instance?.PlayFootstep();
+            footstepTimer += Time.deltaTime;
+            if (footstepTimer >= footstepInterval)
+            {
+                TriggerFootstepSound();
+                footstepTimer = 0f;
+            }
+        }
+        else
+        {
+            footstepTimer = 0f;
+        }
+    }
+
+    private void TriggerFootstepSound()
+    {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlayFootstep();
+
+            AudioSource playerAudio = GetComponent<AudioSource>();
+            if (playerAudio != null)
+            {
+                playerAudio.volume = footstepVolume;
+            }
         }
     }
 

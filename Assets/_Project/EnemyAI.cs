@@ -10,10 +10,10 @@ public class EnemyAI : MonoBehaviour
 
     [Header("Detection Settings")]
     public Transform player;
-    public LayerMask obstacleMask; // Set this to Default / Everything including Trees
+    public LayerMask obstacleMask;
 
     [Header("Random Spawning")]
-    public bool randomizeSpawnOnStart = true;
+    public bool randomizeSpawnOnStart = false;
     public float spawnRadiusX = 25f;
     public float spawnRadiusZ = 25f;
 
@@ -31,6 +31,11 @@ public class EnemyAI : MonoBehaviour
     [Header("Smart Investigation")]
     public float investigateTime = 3f;
     private float searchTimer = 0f;
+
+    [Header("Audio Settings")]
+    public AudioSource approachAudioSource;
+    public AudioClip footstepsSound;
+    public AudioClip chaseSound;
 
     private NavMeshAgent agent;
     private Animator animator;
@@ -53,25 +58,48 @@ public class EnemyAI : MonoBehaviour
 
         animator = GetComponent<Animator>();
         agent = GetComponent<NavMeshAgent>();
+
+        if (approachAudioSource == null)
+        {
+            approachAudioSource = GetComponent<AudioSource>();
+            if (approachAudioSource == null)
+            {
+                approachAudioSource = gameObject.AddComponent<AudioSource>();
+            }
+        }
+
+        Configure3DAudio();
+    }
+
+    private void Configure3DAudio()
+    {
+        approachAudioSource.spatialBlend = 1.0f;
+        approachAudioSource.rolloffMode = AudioRolloffMode.Logarithmic;
+        approachAudioSource.minDistance = 2.0f;
+        approachAudioSource.maxDistance = 35.0f;
+        approachAudioSource.loop = true;
+        approachAudioSource.playOnAwake = false;
     }
 
     void Start()
     {
-        // 1. Randomize spawn position across terrain navmesh on game start
         if (randomizeSpawnOnStart)
         {
             RandomizeSpawnPosition();
         }
 
-        // 2. Assign unique movement parameters
         if (agent != null)
         {
             agent.speed = Random.Range(minSpeed, maxSpeed);
             agent.stoppingDistance = 1.0f;
-            agent.isStopped = true; // Complete freeze on start
+            agent.updateRotation = true;
+            agent.updateUpAxis = true;
         }
 
         pathUpdateTimer = Random.Range(0f, PATH_UPDATE_INTERVAL);
+
+        // Explicitly set state to dormant to reset animations and agent stop states
+        SetState(AIState.Dormant);
     }
 
     void Update()
@@ -80,19 +108,16 @@ public class EnemyAI : MonoBehaviour
 
         float distanceToPlayer = Vector3.Distance(transform.position, player.position);
 
-        // Kill check
         if (distanceToPlayer <= killDistance)
         {
             TriggerJumpscare();
             return;
         }
 
-        // Stagger frame updates
         pathUpdateTimer += Time.deltaTime;
         if (pathUpdateTimer < PATH_UPDATE_INTERVAL) return;
         pathUpdateTimer = 0f;
 
-        // Flashlight Light-Beam Detection (with Raycast Line-of-Sight Check)
         if (flashlight != null && flashlight.enabled && distanceToPlayer <= lightBeamRange)
         {
             Vector3 directionToEnemy = (transform.position - (player.position + Vector3.up * 1.5f)).normalized;
@@ -100,7 +125,6 @@ public class EnemyAI : MonoBehaviour
 
             if (angle < (flashlight.spotAngle / 2f))
             {
-                // Raycast to ensure no tree trunk blocks the light ray
                 if (!Physics.Linecast(player.position + Vector3.up * 1.5f, transform.position + Vector3.up * 1.5f, obstacleMask))
                 {
                     SetState(AIState.ChasingPlayer);
@@ -110,17 +134,14 @@ public class EnemyAI : MonoBehaviour
             }
         }
 
-        // Behavior State Machine Execution
         switch (currentState)
         {
             case AIState.Dormant:
-                // Completely stationary until triggered by noise or direct flashlight contact
                 break;
 
             case AIState.SearchingSound:
                 if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
                 {
-                    // Reached sound origin; search surrounding area briefly before returning dormant
                     currentState = AIState.Investigating;
                     searchTimer = investigateTime;
                 }
@@ -135,14 +156,12 @@ public class EnemyAI : MonoBehaviour
                 break;
 
             case AIState.ChasingPlayer:
-                // Keep updating path toward moving player
                 if (HasLineOfSightToPlayer())
                 {
                     SetTargetPosition(player.position);
                 }
                 else
                 {
-                    // Lost line of sight; walk to player's last seen position then investigate
                     SetTargetPosition(player.position);
                     currentState = AIState.SearchingSound;
                 }
@@ -172,11 +191,11 @@ public class EnemyAI : MonoBehaviour
 
     private void RandomizeSpawnPosition()
     {
-        float minDistanceFromPlayer = 15f; // Keeps enemies at a safe distance on start
+        float minDistanceFromPlayer = 15f;
         Vector3 candidatePosition = Vector3.zero;
         bool validSpotFound = false;
 
-        for (int i = 0; i < 10; i++) // Try up to 10 times to find a far point
+        for (int i = 0; i < 10; i++)
         {
             Vector3 randomPoint = new Vector3(
                 Random.Range(-spawnRadiusX, spawnRadiusX),
@@ -186,7 +205,7 @@ public class EnemyAI : MonoBehaviour
 
             if (player != null && Vector3.Distance(randomPoint, player.position) < minDistanceFromPlayer)
             {
-                continue; // Too close to player, try again
+                continue;
             }
 
             candidatePosition = randomPoint;
@@ -208,11 +227,38 @@ public class EnemyAI : MonoBehaviour
         {
             agent.isStopped = true;
             if (animator != null) animator.SetBool("isWalking", false);
+            StopApproachAudio();
         }
         else
         {
             agent.isStopped = false;
             if (animator != null) animator.SetBool("isWalking", true);
+            PlayStateAudio(newState);
+        }
+    }
+
+    private void PlayStateAudio(AIState state)
+    {
+        if (approachAudioSource == null) return;
+
+        AudioClip targetClip = (state == AIState.ChasingPlayer && chaseSound != null) ? chaseSound : footstepsSound;
+
+        if (targetClip != null)
+        {
+            if (approachAudioSource.clip != targetClip || !approachAudioSource.isPlaying)
+            {
+                approachAudioSource.clip = targetClip;
+                approachAudioSource.playOnAwake = false;
+                approachAudioSource.Play();
+            }
+        }
+    }
+
+    private void StopApproachAudio()
+    {
+        if (approachAudioSource != null && approachAudioSource.isPlaying)
+        {
+            approachAudioSource.Stop();
         }
     }
 
@@ -228,11 +274,37 @@ public class EnemyAI : MonoBehaviour
     private void TriggerJumpscare()
     {
         isAttacking = true;
-        if (agent != null && agent.isActiveAndEnabled) agent.isStopped = true;
+
+        EnemyAI[] allEnemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
+        foreach (EnemyAI enemy in allEnemies)
+        {
+            enemy.isAttacking = true;
+
+            if (enemy.agent != null && enemy.agent.isActiveAndEnabled)
+            {
+                enemy.agent.isStopped = true;
+            }
+
+            if (enemy.animator != null)
+            {
+                enemy.animator.SetBool("isWalking", false);
+            }
+
+            if (enemy.approachAudioSource != null)
+            {
+                enemy.approachAudioSource.Stop();
+                enemy.approachAudioSource.clip = null;
+            }
+
+            enemy.enabled = false;
+        }
 
         transform.LookAt(new Vector3(player.position.x, transform.position.y, player.position.z));
 
         GameOverManager manager = FindFirstObjectByType<GameOverManager>();
-        if (manager != null) manager.ShowGameOver();
+        if (manager != null)
+        {
+            manager.ShowGameOver();
+        }
     }
 }

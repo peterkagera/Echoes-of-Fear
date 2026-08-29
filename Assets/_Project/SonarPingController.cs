@@ -6,18 +6,21 @@ using UnityEngine.InputSystem;
 public class SonarPingController : MonoBehaviour
 {
     [Header("References")]
-    public Transform playerTransform; // Drag Player here
+    public Transform playerTransform;
     public Renderer sonarRenderer;
-    public Light sonarLight;          // Drag your Light component here (optional)
+    public Light sonarLight;
 
     [Header("Sonar Settings")]
     public float maxRadius = 50f;
-    public float pulseSpeed = 15f;
-    public float maxLightIntensity = 5f; // Max light brightness during pulse
+    public float pulseSpeed = 20f;
+    public float maxLightIntensity = 6f;
+    public float fadeOutDuration = 1.2f; // Time fog takes to slowly return to dark
 
     private MaterialPropertyBlock propBlock;
     private float currentRadius = 0f;
     private bool isPinging = false;
+    private bool isFadingOut = false;
+    private float fadeTimer = 0f;
 
     private static readonly int PulseRadiusID = Shader.PropertyToID("_PulseRadius");
     private static readonly int PulseCenterID = Shader.PropertyToID("_PulseCenter");
@@ -26,15 +29,8 @@ public class SonarPingController : MonoBehaviour
     {
         propBlock = new MaterialPropertyBlock();
 
-        if (sonarRenderer == null)
-        {
-            sonarRenderer = GetComponent<Renderer>();
-        }
-
-        if (sonarLight == null)
-        {
-            sonarLight = GetComponent<Light>();
-        }
+        if (sonarRenderer == null) sonarRenderer = GetComponent<Renderer>();
+        if (sonarLight == null) sonarLight = GetComponent<Light>();
 
         if (playerTransform == null)
         {
@@ -42,51 +38,29 @@ public class SonarPingController : MonoBehaviour
             if (playerObj != null) playerTransform = playerObj.transform;
         }
 
-        // Diagnostic: Verify assigned components
-        if (sonarRenderer == null)
-        {
-            Debug.LogError("[SonarPingController] Sonar Renderer is NULL! Assign a Renderer in the Inspector or attach this script to an object with a Renderer.", this);
-        }
-        else
-        {
-            Debug.Log($"[SonarPingController] Assigned Renderer: {sonarRenderer.gameObject.name}", sonarRenderer.gameObject);
-        }
-    }
-
-    void Start()
-    {
         ResetSonarMaterial();
     }
 
-    void OnDisable()
-    {
-        ResetSonarMaterial();
-    }
+    void Start() => ResetSonarMaterial();
+    void OnDisable() => ResetSonarMaterial();
 
     void Update()
     {
         bool eKeyPressed = false;
+
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
         {
             eKeyPressed = true;
         }
-#else
-        if (Input.GetKeyDown(KeyCode.E))
-        {
-            eKeyPressed = true;
-        }
 #endif
 
-        if (eKeyPressed)
+        if (eKeyPressed && !isPinging && !isFadingOut)
         {
-            Debug.Log($"[SonarPingController] 'E' Key pressed. Current isPinging state: {isPinging}");
-            if (!isPinging)
-            {
-                TriggerPing();
-            }
+            TriggerPing();
         }
 
+        // Active Pulse Phase
         if (isPinging)
         {
             currentRadius += pulseSpeed * Time.deltaTime;
@@ -98,20 +72,38 @@ public class SonarPingController : MonoBehaviour
                 sonarRenderer.SetPropertyBlock(propBlock);
             }
 
-            Debug.Log($"[SonarPingController] Pulse Expanding -> Current Radius: {currentRadius:F2} / {maxRadius}");
-
-            // Expand light range and fade intensity out as ping travels
             if (sonarLight != null)
             {
-                float progress = currentRadius / maxRadius;
                 sonarLight.range = currentRadius;
-                sonarLight.intensity = Mathf.Lerp(maxLightIntensity, 0f, progress);
+                sonarLight.intensity = maxLightIntensity;
             }
 
             if (currentRadius >= maxRadius)
             {
-                Debug.Log("[SonarPingController] Ping reached max radius. Resetting.");
                 isPinging = false;
+                isFadingOut = true;
+                fadeTimer = fadeOutDuration;
+
+                // Disable the wave mesh ring, but keep the light fading out
+                if (sonarRenderer != null) sonarRenderer.enabled = false;
+            }
+        }
+
+        // Dissolve Tail (Fog slowly reverts to original state)
+        if (isFadingOut)
+        {
+            fadeTimer -= Time.deltaTime;
+            float fadeProgress = Mathf.Clamp01(fadeTimer / fadeOutDuration);
+
+            if (sonarLight != null)
+            {
+                // Smoothly lower intensity to zero over fadeOutDuration
+                sonarLight.intensity = Mathf.Lerp(0f, maxLightIntensity, fadeProgress);
+            }
+
+            if (fadeTimer <= 0f)
+            {
+                isFadingOut = false;
                 ResetSonarMaterial();
             }
         }
@@ -121,9 +113,18 @@ public class SonarPingController : MonoBehaviour
     {
         currentRadius = 0f;
         isPinging = true;
+        isFadingOut = false;
 
         Vector3 pingOrigin = (playerTransform != null) ? playerTransform.position : transform.position;
-        Debug.Log($"[SonarPingController] Triggering Ping from Origin: {pingOrigin}");
+
+        if (sonarRenderer != null)
+        {
+            sonarRenderer.enabled = true;
+            sonarRenderer.GetPropertyBlock(propBlock);
+            propBlock.SetVector(PulseCenterID, pingOrigin);
+            propBlock.SetFloat(PulseRadiusID, 0f);
+            sonarRenderer.SetPropertyBlock(propBlock);
+        }
 
         if (sonarLight != null)
         {
@@ -133,17 +134,7 @@ public class SonarPingController : MonoBehaviour
             sonarLight.intensity = maxLightIntensity;
         }
 
-        if (sonarRenderer != null)
-        {
-            sonarRenderer.GetPropertyBlock(propBlock);
-            propBlock.SetVector(PulseCenterID, pingOrigin);
-            propBlock.SetFloat(PulseRadiusID, 0f);
-            sonarRenderer.SetPropertyBlock(propBlock);
-        }
-
         EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
-        Debug.Log($"[SonarPingController] Notified {enemies.Length} enemy/enemies of the ping.");
-
         foreach (EnemyAI enemy in enemies)
         {
             enemy.AlertToSound(pingOrigin, maxRadius);
@@ -152,11 +143,15 @@ public class SonarPingController : MonoBehaviour
 
     private void ResetSonarMaterial()
     {
-        if (sonarRenderer != null && propBlock != null)
+        if (sonarRenderer != null)
         {
-            sonarRenderer.GetPropertyBlock(propBlock);
-            propBlock.SetFloat(PulseRadiusID, 0f);
-            sonarRenderer.SetPropertyBlock(propBlock);
+            if (propBlock != null)
+            {
+                sonarRenderer.GetPropertyBlock(propBlock);
+                propBlock.SetFloat(PulseRadiusID, 0f);
+                sonarRenderer.SetPropertyBlock(propBlock);
+            }
+            sonarRenderer.enabled = false;
         }
 
         if (sonarLight != null)
