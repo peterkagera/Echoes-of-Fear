@@ -191,6 +191,7 @@ GameObject:
   - component: {fileID: 4577011528818028798}
   - component: {fileID: 8144565834541084969}
   - component: {fileID: 5436215408234839522}
+  - component: {fileID: 1554182314701018831}
   m_Layer: 0
   m_Name: Birch_7_Terrain
   m_TagString: Untagged
@@ -258,3 +259,19 @@ CapsuleCollider:
   m_Height: 3.4
   m_Direction: 1
   m_Center: {x: 2.217385, y: 1, z: -2.708029}
+--- !u!208 &1554182314701018831
+NavMeshObstacle:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6992565267625586037}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Shape: 0
+  m_Extents: {x: 0.5277398, y: 1.7, z: 0.5277398}
+  m_MoveThreshold: 0.1
+  m_Carve: 1
+  m_CarveOnlyStationary: 1
+  m_Center: {x: 2.217385, y: 1, z: -2.708029}
+  m_TimeToStationary: 0.5

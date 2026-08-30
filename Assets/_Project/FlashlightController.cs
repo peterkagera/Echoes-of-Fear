@@ -17,9 +17,18 @@ public class FlashlightController : MonoBehaviour
     private void Start()
     {
         CurrentBattery = maxBattery;
+
         if (flashlightSpot != null)
         {
             flashlightSpot.enabled = isOn;
+        }
+
+        // Initialize slider properties
+        if (batterySlider != null)
+        {
+            batterySlider.minValue = 0f;
+            batterySlider.maxValue = maxBattery;
+            batterySlider.value = CurrentBattery;
         }
     }
 
@@ -30,7 +39,10 @@ public class FlashlightController : MonoBehaviour
             CurrentBattery -= drainRate * Time.deltaTime;
             CurrentBattery = Mathf.Clamp(CurrentBattery, 0f, maxBattery);
 
-            // Turn off or flicker when battery empties
+            // Update UI Slider each frame while draining
+            UpdateUI();
+
+            // Turn off when battery empties
             if (CurrentBattery <= 0f)
             {
                 isOn = false;
@@ -39,8 +51,6 @@ public class FlashlightController : MonoBehaviour
         }
     }
 
-    // Called automatically by PlayerInput if action named "Flashlight" or "ToggleFlashlight" exists, 
-    // or trigger directly from code.
     public void OnFlashlight(InputValue value)
     {
         if (value.isPressed && CurrentBattery > 0f)
@@ -64,5 +74,14 @@ public class FlashlightController : MonoBehaviour
     public void RechargeBattery(float amount)
     {
         CurrentBattery = Mathf.Clamp(CurrentBattery + amount, 0f, maxBattery);
+        UpdateUI();
+    }
+
+    private void UpdateUI()
+    {
+        if (batterySlider != null)
+        {
+            batterySlider.value = CurrentBattery;
+        }
     }
 }

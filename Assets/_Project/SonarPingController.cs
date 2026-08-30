@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem;
@@ -9,18 +11,28 @@ public class SonarPingController : MonoBehaviour
     public Transform playerTransform;
     public Renderer sonarRenderer;
     public Light sonarLight;
+    public Camera mainCamera;
 
     [Header("Sonar Settings")]
     public float maxRadius = 50f;
     public float pulseSpeed = 20f;
     public float maxLightIntensity = 6f;
-    public float fadeOutDuration = 1.2f; // Time fog takes to slowly return to dark
+    public float fadeOutDuration = 1.2f;
+
+    [Header("Battery Radar (Option B)")]
+    public LayerMask batteryLayer;          // Set to Interactable or Default
+    public Texture2D batteryBlipIcon;       // Optional custom UI dot/icon texture
+    public Color blipColor = Color.cyan;
+    public float blipDisplayDuration = 2.0f;
 
     private MaterialPropertyBlock propBlock;
     private float currentRadius = 0f;
     private bool isPinging = false;
     private bool isFadingOut = false;
     private float fadeTimer = 0f;
+
+    private List<Vector3> detectedBatteries = new List<Vector3>();
+    private float blipTimer = 0f;
 
     private static readonly int PulseRadiusID = Shader.PropertyToID("_PulseRadius");
     private static readonly int PulseCenterID = Shader.PropertyToID("_PulseCenter");
@@ -31,6 +43,7 @@ public class SonarPingController : MonoBehaviour
 
         if (sonarRenderer == null) sonarRenderer = GetComponent<Renderer>();
         if (sonarLight == null) sonarLight = GetComponent<Light>();
+        if (mainCamera == null) mainCamera = Camera.main;
 
         if (playerTransform == null)
         {
@@ -47,7 +60,6 @@ public class SonarPingController : MonoBehaviour
     void Update()
     {
         bool eKeyPressed = false;
-
 #if ENABLE_INPUT_SYSTEM
         if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
         {
@@ -60,7 +72,6 @@ public class SonarPingController : MonoBehaviour
             TriggerPing();
         }
 
-        // Active Pulse Phase
         if (isPinging)
         {
             currentRadius += pulseSpeed * Time.deltaTime;
@@ -84,12 +95,10 @@ public class SonarPingController : MonoBehaviour
                 isFadingOut = true;
                 fadeTimer = fadeOutDuration;
 
-                // Disable the wave mesh ring, but keep the light fading out
                 if (sonarRenderer != null) sonarRenderer.enabled = false;
             }
         }
 
-        // Dissolve Tail (Fog slowly reverts to original state)
         if (isFadingOut)
         {
             fadeTimer -= Time.deltaTime;
@@ -97,7 +106,6 @@ public class SonarPingController : MonoBehaviour
 
             if (sonarLight != null)
             {
-                // Smoothly lower intensity to zero over fadeOutDuration
                 sonarLight.intensity = Mathf.Lerp(0f, maxLightIntensity, fadeProgress);
             }
 
@@ -105,6 +113,15 @@ public class SonarPingController : MonoBehaviour
             {
                 isFadingOut = false;
                 ResetSonarMaterial();
+            }
+        }
+
+        if (blipTimer > 0f)
+        {
+            blipTimer -= Time.deltaTime;
+            if (blipTimer <= 0f)
+            {
+                detectedBatteries.Clear();
             }
         }
     }
@@ -134,11 +151,67 @@ public class SonarPingController : MonoBehaviour
             sonarLight.intensity = maxLightIntensity;
         }
 
+        // Alert Enemies
         EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
         foreach (EnemyAI enemy in enemies)
         {
             enemy.AlertToSound(pingOrigin, maxRadius);
         }
+
+        // Detect Batteries within range
+        ScanForBatteries(pingOrigin);
+    }
+
+    private void ScanForBatteries(Vector3 origin)
+    {
+        detectedBatteries.Clear();
+        Collider[] hits = Physics.OverlapSphere(origin, maxRadius, batteryLayer);
+
+        foreach (Collider hit in hits)
+        {
+            if (hit.GetComponent<BatteryPickup>() != null || hit.CompareTag("Battery"))
+            {
+                detectedBatteries.Add(hit.transform.position);
+            }
+        }
+
+        if (detectedBatteries.Count > 0)
+        {
+            blipTimer = blipDisplayDuration;
+        }
+    }
+
+    private void OnGUI()
+    {
+        if (blipTimer <= 0f || mainCamera == null || detectedBatteries.Count == 0) return;
+
+        Color originalColor = GUI.color;
+        GUI.color = new Color(blipColor.r, blipColor.g, blipColor.b, blipTimer / blipDisplayDuration);
+
+        foreach (Vector3 worldPos in detectedBatteries)
+        {
+            Vector3 screenPos = mainCamera.WorldToScreenPoint(worldPos);
+
+            // Ensure battery is in front of the camera frustum
+            if (screenPos.z > 0)
+            {
+                float guiY = Screen.height - screenPos.y;
+                float size = 16f;
+                Rect rect = new Rect(screenPos.x - size / 2f, guiY - size / 2f, size, size);
+
+                if (batteryBlipIcon != null)
+                {
+                    GUI.DrawTexture(rect, batteryBlipIcon);
+                }
+                else
+                {
+                    // Fallback visual box marker
+                    GUI.Box(rect, "⚡");
+                }
+            }
+        }
+
+        GUI.color = originalColor;
     }
 
     private void ResetSonarMaterial()
