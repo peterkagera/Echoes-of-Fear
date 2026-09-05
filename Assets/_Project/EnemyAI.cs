@@ -16,6 +16,7 @@ public class EnemyAI : MonoBehaviour
     [Header("References")]
     public Transform player;
     public LayerMask obstacleMask;
+    public Transform headTransform; // Drag the head bone here in the Inspector (optional)
 
     [Header("AI Settings")]
     public float moveSpeed = 3.5f;
@@ -30,7 +31,7 @@ public class EnemyAI : MonoBehaviour
     public AudioClip jumpscareSFX;
     public float jumpscareHoldDuration = 1.0f;
     public AudioClip[] footstepSFX;
-    public float footstepInterval = 0.45f; // Time between steps while chasing
+    public float footstepInterval = 0.45f;
 
     [Header("Diagnostics")]
     public bool enableDiagnostics = true;
@@ -91,7 +92,6 @@ public class EnemyAI : MonoBehaviour
             anim.SetBool("isWalking", isMoving);
         }
 
-        // --- Footstep Audio Playback ---
         if (isMoving && footstepSFX != null && footstepSFX.Length > 0)
         {
             footstepTimer += Time.deltaTime;
@@ -107,7 +107,7 @@ public class EnemyAI : MonoBehaviour
         }
         else
         {
-            footstepTimer = footstepInterval; // Reset timer so step plays immediately when starting movement
+            footstepTimer = footstepInterval;
         }
 
         float distToPlayer = Vector3.Distance(transform.position, player.position);
@@ -229,48 +229,37 @@ public class EnemyAI : MonoBehaviour
     private void TriggerJumpscare()
     {
         if (isJumpscaring) return;
-        StartCoroutine(JumpscareRoutine());
-    }
-
-    private IEnumerator JumpscareRoutine()
-    {
         isJumpscaring = true;
+
+        // Optional: Snap enemy to face player's direction and pull closer (0.6m away)
+        Vector3 directionToPlayer = (player.position - transform.position).normalized;
+        directionToPlayer.y = 0; // Keep horizontal alignment
+        transform.rotation = Quaternion.LookRotation(directionToPlayer);
+        transform.position = player.position - (directionToPlayer * 0.6f);
+
+        if (anim != null)
+        {
+            anim.SetBool("isWalking", false);
+            anim.Play("Idle", 0, 0f);
+            anim.speed = 0f;
+        }
 
         if (agent != null)
         {
+            if (agent.isOnNavMesh)
+            {
+                agent.isStopped = true;
+                agent.velocity = Vector3.zero;
+                agent.ResetPath();
+            }
             agent.enabled = false;
         }
 
-        MonoBehaviour playerCtrl = player.GetComponent("PlayerController") as MonoBehaviour;
-        if (playerCtrl != null) playerCtrl.enabled = false;
-
-        Camera mainCam = Camera.main;
-        Transform viewTransform = mainCam != null ? mainCam.transform : player;
-
-        Vector3 camForward = viewTransform.forward;
-        camForward.y = 0f;
-        camForward.Normalize();
-
-        transform.position = viewTransform.position + (camForward * 1.3f) - (Vector3.up * 0.4f);
-        transform.rotation = Quaternion.LookRotation(-camForward);
-
-        if (mainCam != null)
+        if (JumpscareManager.Instance != null)
         {
-            Vector3 enemyHead = transform.position + (Vector3.up * eyeLevelOffset);
-            mainCam.transform.LookAt(enemyHead);
+            JumpscareManager.Instance.TriggerJumpscare(transform, headTransform);
         }
 
-        if (audioSource != null && jumpscareSFX != null)
-        {
-            audioSource.PlayOneShot(jumpscareSFX);
-        }
-
-        yield return new WaitForSeconds(jumpscareHoldDuration);
-
-        GameOverManager gameOverManager = FindFirstObjectByType<GameOverManager>();
-        if (gameOverManager != null)
-        {
-            gameOverManager.ShowGameOver();
-        }
+        this.enabled = false;
     }
 }

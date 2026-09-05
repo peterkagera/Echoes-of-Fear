@@ -16,12 +16,26 @@ public class AudioManager : MonoBehaviour
 
     [Header("Ambient Horror SFX")]
     [SerializeField] private AudioClip[] ambientHorrorClips;
-    [SerializeField] private Vector2 ambientIntervalRange = new Vector2(10f, 25f);
+    [Tooltip("Base timer range between ambient sounds (in seconds).")]
+    [SerializeField] private Vector2 baseIntervalRange = new Vector2(5f, 12f);
+    [Tooltip("Minimum timer range when enemy is close.")]
+    [SerializeField] private Vector2 panicIntervalRange = new Vector2(2f, 5f);
+    [Tooltip("Distance from enemy where tension maxes out.")]
+    [SerializeField] private float panicDistanceThreshold = 15f;
+
+    [Header("3D Spatialization Settings")]
+    [SerializeField] private bool useDirectionalSpawns = true;
+    [SerializeField] private float minSpawnDistance = 6f;
+    [SerializeField] private float maxSpawnDistance = 14f;
 
     [Header("Diagnostics")]
     [SerializeField] private bool enableDiagnostics = false;
 
     private float ambientTimer;
+    private bool isPlayerAlive = true;
+    private Transform playerTransform;
+    private Transform mainCameraTransform;
+    private EnemyAI targetEnemy;
 
     private void Awake()
     {
@@ -31,11 +45,25 @@ public class AudioManager : MonoBehaviour
 
     private void Start()
     {
+        GameObject playerObj = GameObject.FindWithTag("Player");
+        if (playerObj != null)
+        {
+            playerTransform = playerObj.transform;
+        }
+
+        if (Camera.main != null)
+        {
+            mainCameraTransform = Camera.main.transform;
+        }
+
+        targetEnemy = FindFirstObjectByType<EnemyAI>();
         ResetAmbientTimer();
     }
 
     private void Update()
     {
+        if (!isPlayerAlive) return;
+
         HandleAmbientHorror();
     }
 
@@ -50,22 +78,24 @@ public class AudioManager : MonoBehaviour
         footstepSource.pitch = Random.Range(0.85f, 1.15f);
         footstepSource.PlayOneShot(clip);
 
-        GameObject playerObj = GameObject.FindWithTag("Player");
-        if (playerObj != null)
+        if (playerTransform != null)
         {
             EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
             float noiseRadius = 18f;
 
-            if (enableDiagnostics)
-            {
-                Debug.Log($"[AudioManager] Footstep broadcast origin={playerObj.transform.position}, " +
-                          $"radius={noiseRadius:F2}, enemyCount={enemies.Length}", this);
-            }
-
             foreach (EnemyAI enemy in enemies)
             {
-                enemy.AlertToSound(playerObj.transform.position, noiseRadius);
+                enemy.AlertToSound(playerTransform.position, noiseRadius);
             }
+        }
+    }
+
+    public void StopAmbience()
+    {
+        isPlayerAlive = false;
+        if (ambientSource != null)
+        {
+            ambientSource.Stop();
         }
     }
 
@@ -84,20 +114,52 @@ public class AudioManager : MonoBehaviour
         ambientTimer -= Time.deltaTime;
         if (ambientTimer <= 0f)
         {
-            PlayRandomAmbient();
+            PlayDirectionalAmbient();
             ResetAmbientTimer();
         }
     }
 
-    private void PlayRandomAmbient()
+    private void PlayDirectionalAmbient()
     {
-        if (ambientSource == null) return;
+        if (ambientSource == null || ambientHorrorClips.Length == 0) return;
+
         AudioClip clip = ambientHorrorClips[Random.Range(0, ambientHorrorClips.Length)];
+
+        // Pitch variation prevents audio monotony
+        ambientSource.pitch = Random.Range(0.88f, 1.12f);
+
+        if (useDirectionalSpawns && playerTransform != null && mainCameraTransform != null)
+        {
+            // Pick a point behind or to the sides of camera view
+            Vector3 randomDirection = -mainCameraTransform.forward + (Random.insideUnitSphere * 0.8f);
+            randomDirection.y = 0; // Keep horizontal with player
+            randomDirection.Normalize();
+
+            float spawnDistance = Random.Range(minSpawnDistance, maxSpawnDistance);
+            Vector3 soundPosition = playerTransform.position + (randomDirection * spawnDistance);
+
+            ambientSource.transform.position = soundPosition;
+        }
+
         ambientSource.PlayOneShot(clip);
     }
 
     private void ResetAmbientTimer()
     {
-        ambientTimer = Random.Range(ambientIntervalRange.x, ambientIntervalRange.y);
+        Vector2 activeRange = baseIntervalRange;
+
+        // Ramps up frequency if enemy gets close
+        if (playerTransform != null && targetEnemy != null)
+        {
+            float distToEnemy = Vector3.Distance(playerTransform.position, targetEnemy.transform.position);
+            if (distToEnemy <= panicDistanceThreshold)
+            {
+                float tensionFactor = Mathf.Clamp01(distToEnemy / panicDistanceThreshold);
+                activeRange.x = Mathf.Lerp(panicIntervalRange.x, baseIntervalRange.x, tensionFactor);
+                activeRange.y = Mathf.Lerp(panicIntervalRange.y, baseIntervalRange.y, tensionFactor);
+            }
+        }
+
+        ambientTimer = Random.Range(activeRange.x, activeRange.y);
     }
 }

@@ -16,8 +16,15 @@ public class SonarPingController : MonoBehaviour
     [Header("Sonar Settings")]
     public float maxRadius = 50f;
     public float pulseSpeed = 20f;
-    public float maxLightIntensity = 6f;
+    [Tooltip("High intensity for a powerful illuminating pulse wave.")]
+    public float maxLightIntensity = 30f;
     public float fadeOutDuration = 1.2f;
+
+    [Header("3D Light Expansion & Canopy Settings")]
+    [Tooltip("Height offset of the light above the player ground position.")]
+    public float lightHeightOffset = 4.0f;
+    [Tooltip("Multiplier to push light boundaries beyond the ground ring edge so high/distant geometry gets hit.")]
+    public float lightRangeMultiplier = 1.4f;
 
     [Header("Battery Radar")]
     public LayerMask batteryLayer;
@@ -30,6 +37,7 @@ public class SonarPingController : MonoBehaviour
     private bool isPinging = false;
     private bool isFadingOut = false;
     private float fadeTimer = 0f;
+    private Vector3 activePingOrigin;
 
     private List<Vector3> detectedBatteries = new List<Vector3>();
     private float blipTimer = 0f;
@@ -76,6 +84,7 @@ public class SonarPingController : MonoBehaviour
         {
             currentRadius += pulseSpeed * Time.deltaTime;
 
+            // 1. Update Shader Material (Ground Ring)
             if (sonarRenderer != null)
             {
                 sonarRenderer.GetPropertyBlock(propBlock);
@@ -83,10 +92,18 @@ public class SonarPingController : MonoBehaviour
                 sonarRenderer.SetPropertyBlock(propBlock);
             }
 
+            // 2. Dynamic 3D Spherical Light Expansion
             if (sonarLight != null)
             {
-                sonarLight.range = currentRadius;
-                sonarLight.intensity = maxLightIntensity;
+                sonarLight.transform.position = activePingOrigin + (Vector3.up * lightHeightOffset);
+
+                // Calculate true 3D hypotenuse radius to sync horizontal expansion with vertical tree coverage
+                float expanded3DRadius = Mathf.Sqrt((currentRadius * currentRadius) + (lightHeightOffset * lightHeightOffset));
+                sonarLight.range = expanded3DRadius * lightRangeMultiplier;
+
+                // Scale light intensity dynamically as radius expands so far away objects pop brightly
+                float radiusRatio = Mathf.Clamp01(currentRadius / maxRadius);
+                sonarLight.intensity = Mathf.Lerp(maxLightIntensity * 0.6f, maxLightIntensity, radiusRatio);
             }
 
             if (currentRadius >= maxRadius)
@@ -132,32 +149,32 @@ public class SonarPingController : MonoBehaviour
         isPinging = true;
         isFadingOut = false;
 
-        Vector3 pingOrigin = (playerTransform != null) ? playerTransform.position : transform.position;
+        activePingOrigin = (playerTransform != null) ? playerTransform.position : transform.position;
 
         if (sonarRenderer != null)
         {
             sonarRenderer.enabled = true;
             sonarRenderer.GetPropertyBlock(propBlock);
-            propBlock.SetVector(PulseCenterID, pingOrigin);
+            propBlock.SetVector(PulseCenterID, activePingOrigin);
             propBlock.SetFloat(PulseRadiusID, 0f);
             sonarRenderer.SetPropertyBlock(propBlock);
         }
 
         if (sonarLight != null)
         {
-            sonarLight.transform.position = pingOrigin;
+            sonarLight.transform.position = activePingOrigin + (Vector3.up * lightHeightOffset);
             sonarLight.enabled = true;
-            sonarLight.range = 0f;
-            sonarLight.intensity = maxLightIntensity;
+            sonarLight.range = lightHeightOffset * lightRangeMultiplier;
+            sonarLight.intensity = maxLightIntensity * 0.6f;
         }
 
         EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
         foreach (EnemyAI enemy in enemies)
         {
-            enemy.AlertToSound(pingOrigin, maxRadius);
+            enemy.AlertToSound(activePingOrigin, maxRadius);
         }
 
-        ScanForBatteries(pingOrigin);
+        ScanForBatteries(activePingOrigin);
     }
 
     private void ScanForBatteries(Vector3 origin)

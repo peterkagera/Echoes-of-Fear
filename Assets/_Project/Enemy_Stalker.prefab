@@ -98,9 +98,10 @@ MonoBehaviour:
   obstacleMask:
     serializedVersion: 2
     m_Bits: 1
+  headTransform: {fileID: 0}
   moveSpeed: 3.5
   maxChaseDistance: 45
-  killDistance: 1.2
+  killDistance: 1
   eyeLevelOffset: 1.7
   detectionRange: 15
   searchDuration: 5
@@ -108,8 +109,7 @@ MonoBehaviour:
   jumpscareSFX: {fileID: 8300000, guid: 81aac0eb965aadd459873da6b2257705, type: 3}
   jumpscareHoldDuration: 1
   footstepSFX:
-  - {fileID: 8300000, guid: 599728c96c0055943a4707f1eacfd392, type: 3}
-  - {fileID: 8300000, guid: 81ee2453d74ce7a45afc6f998d8a2841, type: 3}
+  - {fileID: 8300000, guid: 188ef86ea3751534ea913e73ac74680f, type: 3}
   footstepInterval: 0.45
   enableDiagnostics: 1
 --- !u!82 &6819641265024838868

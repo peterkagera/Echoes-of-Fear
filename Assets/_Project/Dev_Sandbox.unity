@@ -15,16 +15,16 @@ RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
   m_Fog: 1
-  m_FogColor: {r: 0.050980393, g: 0.06666667, b: 0.09019608, a: 1}
-  m_FogMode: 3
-  m_FogDensity: 0.06
-  m_LinearFogStart: 10
+  m_FogColor: {r: 0.019607844, g: 0.03529412, b: 0.06666667, a: 1}
+  m_FogMode: 1
+  m_FogDensity: 0.012
+  m_LinearFogStart: 8
   m_LinearFogEnd: 45
-  m_AmbientSkyColor: {r: 0, g: 0, b: 0, a: 1}
-  m_AmbientEquatorColor: {r: 0.114, g: 0.125, b: 0.133, a: 1}
-  m_AmbientGroundColor: {r: 0.047, g: 0.043, b: 0.035, a: 1}
+  m_AmbientSkyColor: {r: 0.039215688, g: 0.06666667, b: 0.11372549, a: 1}
+  m_AmbientEquatorColor: {r: 0.019607844, g: 0.03137255, b: 0.05490196, a: 1}
+  m_AmbientGroundColor: {r: 0.007843138, g: 0.011764706, b: 0.015686275, a: 1}
   m_AmbientIntensity: 1
-  m_AmbientMode: 3
+  m_AmbientMode: 1
   m_SubtractiveShadowColor: {r: 0, g: 0, b: 0, a: 1}
   m_SkyboxMaterial: {fileID: 0}
   m_HaloStrength: 0.5
@@ -559,6 +559,158 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8902286055551659032, guid: a1784d193c11cfa4c80ab70576e9b489, type: 3}
   m_PrefabInstance: {fileID: 53844312}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &60211911
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 60211914}
+  - component: {fileID: 60211913}
+  - component: {fileID: 60211912}
+  m_Layer: 0
+  m_Name: JumpscareManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!82 &60211912
+AudioSource:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 60211911}
+  m_Enabled: 1
+  serializedVersion: 4
+  OutputAudioMixerGroup: {fileID: 0}
+  m_audioClip: {fileID: 0}
+  m_Resource: {fileID: 0}
+  m_PlayOnAwake: 1
+  m_Volume: 1
+  m_Pitch: 1
+  Loop: 0
+  Mute: 0
+  Spatialize: 0
+  SpatializePostEffects: 0
+  Priority: 128
+  DopplerLevel: 1
+  MinDistance: 1
+  MaxDistance: 500
+  Pan2D: 0
+  rolloffMode: 0
+  BypassEffects: 0
+  BypassListenerEffects: 0
+  BypassReverbZones: 0
+  rolloffCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  panLevelCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  spreadCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  reverbZoneMixCustomCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+--- !u!114 &60211913
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 60211911}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8b9abc40fe5efeb4289cec94e3ad67b4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::JumpscareManager
+  mainCamera: {fileID: 1404390610}
+  headHeightOffset: 1.8
+  snapToFaceSpeed: 20
+  jumpscareDuration: 2.5
+  shakeIntensity: 0.12
+  shakeFrequency: 35
+  audioSource: {fileID: 60211912}
+  jumpscareSound: {fileID: 8300000, guid: c06054a9944074948b5440a1de724a14, type: 3}
+  gameOverUI: {fileID: 1368303834}
+  playerController: {fileID: 0}
+--- !u!4 &60211914
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 60211911}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 267.62476, y: -0, z: 121.92134}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &76819077
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -7037,8 +7189,10 @@ MonoBehaviour:
   mainCamera: {fileID: 1404390610}
   maxRadius: 50
   pulseSpeed: 15
-  maxLightIntensity: 5
+  maxLightIntensity: 40
   fadeOutDuration: 1.2
+  lightHeightOffset: 4
+  lightRangeMultiplier: 1.4
   batteryLayer:
     serializedVersion: 2
     m_Bits: 256
@@ -12146,8 +12300,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 12
   m_Type: 1
-  m_Color: {r: 0.11372549, g: 0.1764706, b: 0.26666668, a: 1}
-  m_Intensity: 4
+  m_Color: {r: 0.43137255, g: 0.53333336, b: 0.6509804, a: 1}
+  m_Intensity: 0.1
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -12156,7 +12310,7 @@ Light:
     m_Type: 2
     m_Resolution: -1
     m_CustomResolution: -1
-    m_Strength: 1
+    m_Strength: 0.85
     m_Bias: 0.05
     m_NormalBias: 0.4
     m_NearPlane: 0.2
@@ -23298,8 +23452,8 @@ AudioSource:
   SpatializePostEffects: 0
   Priority: 128
   DopplerLevel: 1
-  MinDistance: 1
-  MaxDistance: 500
+  MinDistance: 3
+  MaxDistance: 25
   Pan2D: 0
   rolloffMode: 0
   BypassEffects: 0
@@ -23334,7 +23488,7 @@ AudioSource:
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 0
+      value: 1
       inSlope: 0
       outSlope: 0
       tangentMode: 0
@@ -25303,8 +25457,13 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 18b057711da7f6d40a924daebe3ffe3c, type: 3}
   - {fileID: 8300000, guid: 426da3f636efa07458c77730fdd7a1f1, type: 3}
   - {fileID: 8300000, guid: ce11ecb29bc278d4cbfcc4540ce706b7, type: 3}
-  ambientIntervalRange: {x: 10, y: 25}
-  enableDiagnostics: 0
+  baseIntervalRange: {x: 5, y: 12}
+  panicIntervalRange: {x: 2, y: 5}
+  panicDistanceThreshold: 15
+  useDirectionalSpawns: 1
+  minSpawnDistance: 6
+  maxSpawnDistance: 14
+  enableDiagnostics: 1
 --- !u!4 &1988892228
 Transform:
   m_ObjectHideFlags: 0
@@ -27187,3 +27346,4 @@ SceneRoots:
   - {fileID: 1091264810}
   - {fileID: 701374572}
   - {fileID: 1330621204}
+  - {fileID: 60211914}
