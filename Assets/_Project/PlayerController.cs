@@ -11,8 +11,8 @@ public class PlayerController : MonoBehaviour
 
     [Header("Footstep Settings")]
     [SerializeField] private float footstepInterval = 0.45f;
-    [Range(0f, 2f)]
-    [SerializeField] private float footstepVolume = 1.0f;
+    //[Range(0f, 2f)]
+    //[SerializeField] private float footstepVolume = 1.0f;
     private float footstepTimer = 0f;
 
     [Header("References")]
@@ -94,12 +94,6 @@ public class PlayerController : MonoBehaviour
         if (AudioManager.Instance != null)
         {
             AudioManager.Instance.PlayFootstep();
-
-            AudioSource playerAudio = GetComponent<AudioSource>();
-            if (playerAudio != null)
-            {
-                playerAudio.volume = footstepVolume;
-            }
         }
     }
 

@@ -18,6 +18,9 @@ public class AudioManager : MonoBehaviour
     [SerializeField] private AudioClip[] ambientHorrorClips;
     [SerializeField] private Vector2 ambientIntervalRange = new Vector2(10f, 25f);
 
+    [Header("Diagnostics")]
+    [SerializeField] private bool enableDiagnostics = false;
+
     private float ambientTimer;
 
     private void Awake()
@@ -41,18 +44,23 @@ public class AudioManager : MonoBehaviour
 
     public void PlayFootstep()
     {
-        if (footstepSFXArray == null || footstepSFXArray.Length == 0 || footstepSource == null || footstepSource.isPlaying) return;
+        if (footstepSFXArray == null || footstepSFXArray.Length == 0 || footstepSource == null) return;
 
         AudioClip clip = footstepSFXArray[Random.Range(0, footstepSFXArray.Length)];
         footstepSource.pitch = Random.Range(0.85f, 1.15f);
         footstepSource.PlayOneShot(clip);
 
-        // Broadcast sound position to all active enemies in scene
         GameObject playerObj = GameObject.FindWithTag("Player");
         if (playerObj != null)
         {
             EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
-            float noiseRadius = 18f; // Distance sound carries
+            float noiseRadius = 18f;
+
+            if (enableDiagnostics)
+            {
+                Debug.Log($"[AudioManager] Footstep broadcast origin={playerObj.transform.position}, " +
+                          $"radius={noiseRadius:F2}, enemyCount={enemies.Length}", this);
+            }
 
             foreach (EnemyAI enemy in enemies)
             {

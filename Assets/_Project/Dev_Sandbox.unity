@@ -23383,7 +23383,7 @@ Transform:
   m_GameObject: {fileID: 1808963425}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 98.4, y: 0, z: 28.5}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -25304,6 +25304,7 @@ MonoBehaviour:
   - {fileID: 8300000, guid: 426da3f636efa07458c77730fdd7a1f1, type: 3}
   - {fileID: 8300000, guid: ce11ecb29bc278d4cbfcc4540ce706b7, type: 3}
   ambientIntervalRange: {x: 10, y: 25}
+  enableDiagnostics: 0
 --- !u!4 &1988892228
 Transform:
   m_ObjectHideFlags: 0
@@ -25318,8 +25319,8 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 685762514}
-  - {fileID: 2007872296}
   - {fileID: 1808963427}
+  - {fileID: 2007872296}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1993185512
@@ -25484,7 +25485,7 @@ AudioSource:
     m_Curve:
     - serializedVersion: 3
       time: 0
-      value: 1
+      value: 0
       inSlope: 0
       outSlope: 0
       tangentMode: 0
@@ -25532,7 +25533,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2007872294}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -26931,9 +26932,10 @@ MonoBehaviour:
   playerTransform: {fileID: 1096360761}
   totalEnemiesToSpawn: 10
   spawnInterval: 10
-  minDistanceFromPlayer: 20
-  spawnRadius: 45
-  despawnDistance: 70
+  minDistanceFromPlayer: 15
+  spawnRadius: 35
+  despawnDistance: 65
+  enableDiagnostics: 1
 --- !u!4 &2112283867
 Transform:
   m_ObjectHideFlags: 0

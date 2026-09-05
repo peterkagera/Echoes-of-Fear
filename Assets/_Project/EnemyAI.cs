@@ -2,449 +2,275 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.AI;
 
+[RequireComponent(typeof(NavMeshAgent))]
 public class EnemyAI : MonoBehaviour
 {
-    public enum AIState { Dormant, SearchingSound, ChasingPlayer, Investigating }
+    public enum AIState
+    {
+        Dormant,
+        ChasingPlayer,
+        SearchingSound,
+        Patrolling
+    }
 
-    [Header("Current State")]
-    [SerializeField] private AIState currentState = AIState.Dormant;
-
-    [Header("Detection Settings")]
+    [Header("References")]
     public Transform player;
     public LayerMask obstacleMask;
-    public float maxChaseDistance = 25f;
 
-    [Header("Random Spawning")]
-    public bool randomizeSpawnOnStart = false;
-    public float spawnRadiusX = 25f;
-    public float spawnRadiusZ = 25f;
-
-    [Header("Speed & Variance")]
-    public float minSpeed = 1.25f;
-    public float maxSpeed = 1.9f;
-    private float targetAssignedSpeed = 1.5f;
-
-    [Header("Flashlight Detection")]
-    public Light flashlight;
-    public float lightBeamRange = 25f;
-
-    [Header("Attack Settings")]
+    [Header("AI Settings")]
+    public float moveSpeed = 3.5f;
+    public float maxChaseDistance = 45f;
     public float killDistance = 1.8f;
-    public float maxKillVerticalDistance = 2.0f;
-    public float jumpscareDuration = 1.2f;
-    public string jumpscareTriggerName = "Jumpscare";
-
-    [Header("Smart Investigation")]
-    public float investigateTime = 3f;
-    private float searchTimer = 0f;
+    public float eyeLevelOffset = 1.6f;
+    public float detectionRange = 12.0f;
+    public float searchDuration = 5.0f;
 
     [Header("Audio Settings")]
-    public AudioSource approachAudioSource;
-    public AudioClip footstepsSound;
-    public AudioClip chaseSound;
-    public AudioClip jumpscareSound;
+    public AudioSource audioSource;
+    public AudioClip jumpscareSFX;
+    public float jumpscareHoldDuration = 1.0f;
+    public AudioClip[] footstepSFX;
+    public float footstepInterval = 0.45f; // Time between steps while chasing
+
+    [Header("Diagnostics")]
+    public bool enableDiagnostics = true;
 
     private NavMeshAgent agent;
-    private Animator animator;
+    private Animator anim;
+    private AIState currentState = AIState.Dormant;
     private float pathUpdateTimer = 0f;
     private const float PATH_UPDATE_INTERVAL = 0.25f;
-    private bool isAttacking = false;
-    private Vector3 lastDestination;
 
-    private float killDistanceSqr;
-    private float maxChaseDistanceSqr;
-    private float lightBeamRangeSqr;
+    private Vector3 lastKnownPlayerPos;
+    private float searchTimer = 0f;
+    private bool isJumpscaring = false;
+    private float logTimer = 0f;
+    private float footstepTimer = 0f;
 
     void Awake()
     {
-        animator = GetComponentInChildren<Animator>();
         agent = GetComponent<NavMeshAgent>();
+        anim = GetComponentInChildren<Animator>();
 
-        if (animator == null)
+        if (anim != null)
         {
-            Debug.LogWarning($"[EnemyAI] Animator component not found in children of {gameObject.name}!");
-        }
-
-        if (agent == null)
-        {
-            Debug.LogError($"[EnemyAI] Critical Error: NavMeshAgent component missing from {gameObject.name}!");
-        }
-
-        if (player == null)
-        {
-            GameObject playerObj = GameObject.FindWithTag("Player");
-            if (playerObj != null)
-            {
-                player = playerObj.transform;
-            }
-            else
-            {
-                Debug.LogError($"[EnemyAI] Critical Error: Player reference could not be found or tagged in the scene for {gameObject.name}!");
-            }
-        }
-
-        if (flashlight == null && player != null)
-        {
-            flashlight = player.GetComponentInChildren<Light>();
-        }
-
-        if (approachAudioSource == null)
-        {
-            approachAudioSource = GetComponent<AudioSource>();
-            if (approachAudioSource == null)
-            {
-                approachAudioSource = gameObject.AddComponent<AudioSource>();
-            }
-        }
-
-        Configure3DAudio();
-
-        if (animator != null)
-        {
-            animator.SetBool("isWalking", false);
-        }
-    }
-
-    private void Configure3DAudio()
-    {
-        approachAudioSource.spatialBlend = 1.0f;
-        approachAudioSource.rolloffMode = AudioRolloffMode.Linear;
-        approachAudioSource.minDistance = 1.5f;
-        approachAudioSource.maxDistance = 15.0f;
-        approachAudioSource.loop = true;
-        approachAudioSource.playOnAwake = false;
-    }
-
-    void Start()
-    {
-        killDistanceSqr = killDistance * killDistance;
-        maxChaseDistanceSqr = maxChaseDistance * maxChaseDistance;
-        lightBeamRangeSqr = lightBeamRange * lightBeamRange;
-
-        if (randomizeSpawnOnStart)
-        {
-            RandomizeSpawnPosition();
+            anim.applyRootMotion = false;
         }
 
         if (agent != null)
         {
-            targetAssignedSpeed = Random.Range(minSpeed, maxSpeed);
-            agent.speed = targetAssignedSpeed;
-            agent.acceleration = 3f;
-            agent.stoppingDistance = 1.0f;
-            agent.updateRotation = true;
-            agent.updateUpAxis = true;
+            agent.speed = moveSpeed;
+            agent.acceleration = 20f;
+            agent.angularSpeed = 360f;
+            agent.stoppingDistance = 0.8f;
+            agent.autoBraking = true;
+        }
+    }
+
+    void Start()
+    {
+        if (player == null)
+        {
+            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null) player = playerObj.transform;
         }
 
-        pathUpdateTimer = Random.Range(0f, PATH_UPDATE_INTERVAL);
+        if (audioSource == null) audioSource = GetComponent<AudioSource>();
+
         SetState(AIState.Dormant);
     }
 
     void Update()
     {
-        if (player == null || agent == null || isAttacking) return;
+        if (player == null || isJumpscaring) return;
 
-        pathUpdateTimer += Time.deltaTime;
-        if (pathUpdateTimer < PATH_UPDATE_INTERVAL) return;
-        pathUpdateTimer = 0f;
+        bool isMoving = agent != null && agent.velocity.sqrMagnitude > 0.1f && !agent.isStopped;
 
-        Vector3 playerPos = player.position;
-        Vector3 transformPos = transform.position;
-
-        Vector3 diff = transformPos - playerPos;
-        float horizontalSqr = new Vector3(diff.x, 0f, diff.z).sqrMagnitude;
-        float verticalDistance = Mathf.Abs(diff.y);
-
-        if (currentState != AIState.Dormant && horizontalSqr <= killDistanceSqr && verticalDistance <= maxKillVerticalDistance)
+        if (anim != null)
         {
-            StartCoroutine(JumpscareSequence());
-            return;
+            anim.SetBool("isWalking", isMoving);
         }
 
-        float fullDistanceSqr = diff.sqrMagnitude;
-
-        if (currentState != AIState.Dormant && flashlight != null && flashlight.enabled && fullDistanceSqr <= lightBeamRangeSqr)
+        // --- Footstep Audio Playback ---
+        if (isMoving && footstepSFX != null && footstepSFX.Length > 0)
         {
-            Vector3 directionToEnemy = (transformPos - (playerPos + Vector3.up * 1.5f)).normalized;
-            float angle = Vector3.Angle(player.forward, directionToEnemy);
-
-            if (angle < (flashlight.spotAngle / 2f))
+            footstepTimer += Time.deltaTime;
+            if (footstepTimer >= footstepInterval)
             {
-                if (!Physics.Linecast(playerPos + Vector3.up * 1.5f, transformPos + Vector3.up * 1.5f, obstacleMask))
+                footstepTimer = 0f;
+                AudioClip randomStep = footstepSFX[Random.Range(0, footstepSFX.Length)];
+                if (audioSource != null && randomStep != null)
                 {
-                    SetState(AIState.ChasingPlayer);
-                    SetTargetPosition(playerPos);
-                    return;
+                    audioSource.PlayOneShot(randomStep, 0.7f);
                 }
             }
+        }
+        else
+        {
+            footstepTimer = footstepInterval; // Reset timer so step plays immediately when starting movement
+        }
+
+        float distToPlayer = Vector3.Distance(transform.position, player.position);
+
+        if (enableDiagnostics)
+        {
+            logTimer += Time.deltaTime;
+            if (logTimer >= 2.0f)
+            {
+                logTimer = 0f;
+                Debug.Log($"[{gameObject.name}] State={currentState} | Dist={distToPlayer:F1}m | Speed={agent.velocity.magnitude:F1}m/s | HasPath={agent.hasPath}", this);
+            }
+        }
+
+        if (distToPlayer <= killDistance)
+        {
+            TriggerJumpscare();
+            return;
         }
 
         switch (currentState)
         {
             case AIState.Dormant:
-                break;
-
-            case AIState.SearchingSound:
-                if (HasLineOfSightToPlayer() && fullDistanceSqr <= maxChaseDistanceSqr)
+            case AIState.Patrolling:
+                if (distToPlayer <= 4.0f || (distToPlayer <= detectionRange && HasLineOfSight()))
                 {
                     SetState(AIState.ChasingPlayer);
-                    break;
-                }
-
-                if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
-                {
-                    currentState = AIState.Investigating;
-                    searchTimer = investigateTime;
-                }
-                break;
-
-            case AIState.Investigating:
-                if (HasLineOfSightToPlayer() && fullDistanceSqr <= maxChaseDistanceSqr)
-                {
-                    SetState(AIState.ChasingPlayer);
-                    break;
-                }
-
-                searchTimer -= PATH_UPDATE_INTERVAL;
-                if (searchTimer <= 0f)
-                {
-                    SetState(AIState.Dormant);
                 }
                 break;
 
             case AIState.ChasingPlayer:
-                if (fullDistanceSqr <= maxChaseDistanceSqr && HasLineOfSightToPlayer())
+                pathUpdateTimer += Time.deltaTime;
+                if (pathUpdateTimer >= PATH_UPDATE_INTERVAL)
                 {
-                    SetTargetPosition(playerPos);
+                    pathUpdateTimer = 0f;
+                    SetTargetPosition(player.position);
                 }
-                else
+
+                if (distToPlayer > maxChaseDistance)
                 {
-                    SetTargetPosition(playerPos);
-                    currentState = AIState.SearchingSound;
+                    lastKnownPlayerPos = player.position;
+                    searchTimer = 0f;
+                    SetState(AIState.SearchingSound);
+                }
+                break;
+
+            case AIState.SearchingSound:
+                if (distToPlayer <= detectionRange && HasLineOfSight())
+                {
+                    SetState(AIState.ChasingPlayer);
+                    return;
+                }
+
+                if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
+                {
+                    searchTimer += Time.deltaTime;
+                    if (searchTimer >= searchDuration)
+                    {
+                        SetState(AIState.Dormant);
+                    }
                 }
                 break;
         }
     }
 
-    public void AlertToSound(Vector3 soundOriginPosition, float soundRadius)
-    {
-        if (isAttacking) return;
-
-        float soundRadiusSqr = soundRadius * soundRadius;
-        float distanceToSoundSqr = (transform.position - soundOriginPosition).sqrMagnitude;
-
-        if (distanceToSoundSqr <= soundRadiusSqr)
-        {
-            if (HasLineOfSightToPlayer())
-            {
-                SetState(AIState.ChasingPlayer);
-                SetTargetPosition(player.position);
-            }
-            else
-            {
-                SetState(AIState.SearchingSound);
-                SetTargetPosition(soundOriginPosition);
-            }
-        }
-    }
-
-    private bool HasLineOfSightToPlayer()
+    public bool HasLineOfSight()
     {
         if (player == null) return false;
-        Vector3 eyeLevelPos = transform.position + Vector3.up * 1.5f;
-        Vector3 playerEyePos = player.position + Vector3.up * 1.5f;
+        Vector3 eyePos = transform.position + (Vector3.up * eyeLevelOffset);
+        Vector3 targetEyePos = player.position + (Vector3.up * eyeLevelOffset);
+        Vector3 dir = (targetEyePos - eyePos).normalized;
 
-        return !Physics.Linecast(eyeLevelPos, playerEyePos, obstacleMask);
+        if (Physics.Raycast(eyePos, dir, out RaycastHit hit, detectionRange, ~0, QueryTriggerInteraction.Ignore))
+        {
+            return hit.transform.IsChildOf(player) || hit.transform == player;
+        }
+        return false;
     }
 
-    private void RandomizeSpawnPosition()
+    public void AlertToSound(Vector3 soundPosition, float volume)
     {
-        if (agent == null) return;
+        if (isJumpscaring || currentState == AIState.ChasingPlayer) return;
 
-        float minDistSqr = 225f;
-        Vector3 candidatePosition = Vector3.zero;
-        bool validSpotFound = false;
-
-        for (int i = 0; i < 10; i++)
+        float distToSound = Vector3.Distance(transform.position, soundPosition);
+        if (distToSound <= detectionRange * volume)
         {
-            Vector3 randomPoint = new Vector3(
-                Random.Range(-spawnRadiusX, spawnRadiusX),
-                0f,
-                Random.Range(-spawnRadiusZ, spawnRadiusZ)
-            );
-
-            if (player != null && (randomPoint - player.position).sqrMagnitude < minDistSqr)
-            {
-                continue;
-            }
-
-            candidatePosition = randomPoint;
-            validSpotFound = true;
-            break;
+            SetState(AIState.SearchingSound);
+            SetTargetPosition(soundPosition);
         }
+    }
 
-        if (validSpotFound && NavMesh.SamplePosition(candidatePosition, out NavMeshHit hit, 15.0f, NavMesh.AllAreas))
+    public void SetTargetPosition(Vector3 targetPos)
+    {
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
         {
-            agent.Warp(hit.position);
+            agent.isStopped = false;
+            agent.SetDestination(targetPos);
         }
     }
 
     public void SetState(AIState newState)
     {
+        if (isJumpscaring || currentState == newState) return;
+
+        if (enableDiagnostics)
+        {
+            Debug.Log($"[{gameObject.name}] State Change: {currentState} -> {newState}", this);
+        }
+
         currentState = newState;
 
-        if (currentState == AIState.Dormant)
+        if (agent != null && agent.isOnNavMesh)
         {
-            if (agent != null && agent.isActiveAndEnabled)
-            {
-                agent.isStopped = true;
-                agent.ResetPath();
-            }
-            if (animator != null) animator.SetBool("isWalking", false);
-            StopApproachAudio();
-        }
-        else
-        {
-            if (agent != null && agent.isActiveAndEnabled)
-            {
-                agent.isStopped = false;
-                agent.speed = targetAssignedSpeed * 0.5f;
-                StartCoroutine(RampUpAgentSpeed());
-            }
-            if (animator != null) animator.SetBool("isWalking", true);
-            PlayStateAudio(newState);
+            agent.isStopped = false;
+            agent.speed = moveSpeed;
         }
     }
 
-    private IEnumerator RampUpAgentSpeed()
+    private void TriggerJumpscare()
     {
-        float elapsed = 0f;
-        float duration = 0.6f;
-        while (elapsed < duration && agent != null && agent.isActiveAndEnabled)
-        {
-            elapsed += Time.deltaTime;
-            agent.speed = Mathf.Lerp(targetAssignedSpeed * 0.5f, targetAssignedSpeed, elapsed / duration);
-            yield return null;
-        }
-        if (agent != null && agent.isActiveAndEnabled)
-        {
-            agent.speed = targetAssignedSpeed;
-        }
+        if (isJumpscaring) return;
+        StartCoroutine(JumpscareRoutine());
     }
 
-    private void PlayStateAudio(AIState state)
+    private IEnumerator JumpscareRoutine()
     {
-        if (approachAudioSource == null) return;
+        isJumpscaring = true;
 
-        AudioClip targetClip = (state == AIState.ChasingPlayer && chaseSound != null) ? chaseSound : footstepsSound;
-
-        if (targetClip != null)
-        {
-            if (approachAudioSource.clip != targetClip || !approachAudioSource.isPlaying)
-            {
-                approachAudioSource.clip = targetClip;
-                approachAudioSource.playOnAwake = false;
-                approachAudioSource.Play();
-            }
-        }
-    }
-
-    private void StopApproachAudio()
-    {
-        if (approachAudioSource != null && approachAudioSource.isPlaying)
-        {
-            approachAudioSource.Stop();
-        }
-    }
-
-    private void SetTargetPosition(Vector3 targetPos)
-    {
-        if (agent != null && agent.isActiveAndEnabled)
-        {
-            if ((targetPos - lastDestination).sqrMagnitude > 0.25f)
-            {
-                lastDestination = targetPos;
-                agent.isStopped = false;
-                agent.SetDestination(targetPos);
-            }
-        }
-    }
-
-    private IEnumerator JumpscareSequence()
-    {
-        isAttacking = true;
-
-        if (transform.parent != null)
-        {
-            for (int i = 0; i < transform.parent.childCount; i++)
-            {
-                EnemyAI enemy = transform.parent.GetChild(i).GetComponent<EnemyAI>();
-                if (enemy != null)
-                {
-                    enemy.isAttacking = true;
-                    if (enemy.agent != null && enemy.agent.isActiveAndEnabled) enemy.agent.isStopped = true;
-                    if (enemy.animator != null) enemy.animator.SetBool("isWalking", false);
-                    if (enemy.approachAudioSource != null) enemy.approachAudioSource.Stop();
-                    if (enemy != this) enemy.enabled = false;
-                }
-            }
-        }
-
-        // CRITICAL FIX: Explicitly disable the NavMeshAgent first so it stops overriding the enemy's world position
         if (agent != null)
         {
             agent.enabled = false;
         }
 
-        if (player != null)
+        MonoBehaviour playerCtrl = player.GetComponent("PlayerController") as MonoBehaviour;
+        if (playerCtrl != null) playerCtrl.enabled = false;
+
+        Camera mainCam = Camera.main;
+        Transform viewTransform = mainCam != null ? mainCam.transform : player;
+
+        Vector3 camForward = viewTransform.forward;
+        camForward.y = 0f;
+        camForward.Normalize();
+
+        transform.position = viewTransform.position + (camForward * 1.3f) - (Vector3.up * 0.4f);
+        transform.rotation = Quaternion.LookRotation(-camForward);
+
+        if (mainCam != null)
         {
-            MonoBehaviour[] playerScripts = player.GetComponents<MonoBehaviour>();
-            for (int i = 0; i < playerScripts.Length; i++)
-            {
-                MonoBehaviour s = playerScripts[i];
-                if (s != this && !s.GetType().Name.Contains("Audio"))
-                {
-                    s.enabled = false;
-                }
-            }
-
-            Camera mainCam = Camera.main;
-            Transform camTransform = mainCam != null ? mainCam.transform : player;
-
-            // Place enemy perfectly in front of the camera view
-            Vector3 targetSpot = camTransform.position + camTransform.forward * 1.0f - Vector3.up * 0.2f;
-            transform.position = targetSpot;
-
-            Renderer[] renderers = GetComponentsInChildren<Renderer>();
-            for (int r = 0; r < renderers.Length; r++)
-            {
-                renderers[r].enabled = true;
-            }
-
-            transform.LookAt(new Vector3(camTransform.position.x, transform.position.y, camTransform.position.z));
-
-            if (mainCam != null)
-            {
-                mainCam.transform.LookAt(transform.position + Vector3.up * 0.5f);
-            }
+            Vector3 enemyHead = transform.position + (Vector3.up * eyeLevelOffset);
+            mainCam.transform.LookAt(enemyHead);
         }
 
-        if (animator != null)
+        if (audioSource != null && jumpscareSFX != null)
         {
-            animator.SetTrigger(jumpscareTriggerName);
+            audioSource.PlayOneShot(jumpscareSFX);
         }
 
-        if (jumpscareSound != null && approachAudioSource != null)
-        {
-            approachAudioSource.PlayOneShot(jumpscareSound);
-        }
+        yield return new WaitForSeconds(jumpscareHoldDuration);
 
-        yield return new WaitForSeconds(jumpscareDuration);
-
-        GameOverManager manager = FindFirstObjectByType<GameOverManager>();
-        if (manager != null)
+        GameOverManager gameOverManager = FindFirstObjectByType<GameOverManager>();
+        if (gameOverManager != null)
         {
-            manager.ShowGameOver();
+            gameOverManager.ShowGameOver();
         }
     }
 }

@@ -19,9 +19,9 @@ public class SonarPingController : MonoBehaviour
     public float maxLightIntensity = 6f;
     public float fadeOutDuration = 1.2f;
 
-    [Header("Battery Radar (Option B)")]
-    public LayerMask batteryLayer;          // Set to Interactable or Default
-    public Texture2D batteryBlipIcon;       // Optional custom UI dot/icon texture
+    [Header("Battery Radar")]
+    public LayerMask batteryLayer;
+    public Texture2D batteryBlipIcon;
     public Color blipColor = Color.cyan;
     public float blipDisplayDuration = 2.0f;
 
@@ -151,14 +151,12 @@ public class SonarPingController : MonoBehaviour
             sonarLight.intensity = maxLightIntensity;
         }
 
-        // Alert Enemies
         EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
         foreach (EnemyAI enemy in enemies)
         {
             enemy.AlertToSound(pingOrigin, maxRadius);
         }
 
-        // Detect Batteries within range
         ScanForBatteries(pingOrigin);
     }
 
@@ -192,7 +190,6 @@ public class SonarPingController : MonoBehaviour
         {
             Vector3 screenPos = mainCamera.WorldToScreenPoint(worldPos);
 
-            // Ensure battery is in front of the camera frustum
             if (screenPos.z > 0)
             {
                 float guiY = Screen.height - screenPos.y;
@@ -205,7 +202,6 @@ public class SonarPingController : MonoBehaviour
                 }
                 else
                 {
-                    // Fallback visual box marker
                     GUI.Box(rect, "⚡");
                 }
             }
