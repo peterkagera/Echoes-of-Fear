@@ -14,19 +14,23 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
     public WheelCollider backWheelRight;
 
     [Header("Vehicle Physics")]
-    public float motorTorque = 15000f;
-    public float maxSteerAngle = 35f;
-    public float brakeTorque = 3000f;
+    public float motorTorque = 9000f;
+    public float brakeTorque = 25000f;      // Strong brake force
+    public float idleBrakeTorque = 8000f;   // Strong drag on release
+    public float maxSteerAngle = 42f;
+    public float steerSpeed = 120f;         // Fast turn rate
     public Vector3 centerOfMassOffset = new Vector3(0f, -0.8f, 0f);
+
+    [Header("Path & Headlight Vision")]
+    public Light headlight;
+    public Light pathLight;
+    public Light cabLight;
+    public AudioSource audioSource;
 
     [Header("Tree Battering Ram")]
     public float minRamSpeed = 0.5f;
     public GameObject splinterPrefab;
     public AudioClip woodSnapSound;
-
-    [Header("Sonar High-Beams")]
-    public Light headlight;
-    public AudioSource audioSource;
 
     private bool isDriving = false;
     private float enterCooldown = 0f;
@@ -47,10 +51,13 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
             rb.centerOfMass = centerOfMassOffset;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-            rb.linearDamping = 0.5f; // Increased slightly to prevent unnatural sliding
+            rb.linearDamping = 0.15f;
+            rb.angularDamping = 2.0f;
         }
 
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
+
+        SetVehicleLights(false);
     }
 
     public string GetPrompt() => isDriving ? "" : "Drive Tuk-Tuk";
@@ -66,7 +73,6 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
         if (!isDriving) return;
 
-        // Reset inputs every frame
         currentSteerInput = 0f;
         currentAccelInput = 0f;
 
@@ -92,38 +98,71 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
     private void FixedUpdate()
     {
-        if (!isDriving) return;
+        if (!isDriving || rb == null) return;
 
-        if (frontWheel != null) frontWheel.steerAngle = currentSteerInput * maxSteerAngle;
-
-        if (currentAccelInput != 0f)
+        float targetSteerAngle = currentSteerInput * maxSteerAngle;
+        if (frontWheel != null)
         {
-            // Driving forward or backward
-            if (backWheelLeft != null)
+            frontWheel.steerAngle = Mathf.MoveTowards(
+                frontWheel.steerAngle,
+                targetSteerAngle,
+                steerSpeed * Time.fixedDeltaTime * 10f
+            );
+        }
+
+        float forwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
+
+        if (currentAccelInput > 0f)
+        {
+            if (forwardSpeed < -0.5f)
             {
-                backWheelLeft.motorTorque = currentAccelInput * motorTorque;
-                backWheelLeft.brakeTorque = 0f;
+                ApplyBrakes(brakeTorque);
             }
-            if (backWheelRight != null)
+            else
             {
-                backWheelRight.motorTorque = currentAccelInput * motorTorque;
-                backWheelRight.brakeTorque = 0f;
+                ApplyMotor(currentAccelInput * motorTorque);
+            }
+        }
+        else if (currentAccelInput < 0f)
+        {
+            if (forwardSpeed > 0.5f)
+            {
+                ApplyBrakes(brakeTorque);
+            }
+            else
+            {
+                ApplyMotor(currentAccelInput * motorTorque);
             }
         }
         else
         {
-            // Idle / Key Released: Apply full brake torque to stop forward momentum immediately
-            if (backWheelLeft != null)
-            {
-                backWheelLeft.motorTorque = 0f;
-                backWheelLeft.brakeTorque = brakeTorque;
-            }
-            if (backWheelRight != null)
-            {
-                backWheelRight.motorTorque = 0f;
-                backWheelRight.brakeTorque = brakeTorque;
-            }
+            ApplyBrakes(idleBrakeTorque);
         }
+    }
+
+    private void ApplyMotor(float torque)
+    {
+        if (frontWheel != null) frontWheel.brakeTorque = 0f;
+        if (backWheelLeft != null)
+        {
+            backWheelLeft.brakeTorque = 0f;
+            backWheelLeft.motorTorque = torque;
+        }
+        if (backWheelRight != null)
+        {
+            backWheelRight.brakeTorque = 0f;
+            backWheelRight.motorTorque = torque;
+        }
+    }
+
+    private void ApplyBrakes(float torque)
+    {
+        if (backWheelLeft != null) backWheelLeft.motorTorque = 0f;
+        if (backWheelRight != null) backWheelRight.motorTorque = 0f;
+
+        if (frontWheel != null) frontWheel.brakeTorque = torque;
+        if (backWheelLeft != null) backWheelLeft.brakeTorque = torque;
+        if (backWheelRight != null) backWheelRight.brakeTorque = torque;
     }
 
     private void LateUpdate()
@@ -135,12 +174,19 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         }
     }
 
+    private void SetVehicleLights(bool enable)
+    {
+        if (headlight != null) headlight.enabled = enable;
+        if (pathLight != null) pathLight.enabled = enable;
+        if (cabLight != null) cabLight.enabled = enable;
+    }
+
     private void TriggerSonarPulse()
     {
         if (headlight != null)
         {
-            headlight.enabled = true;
-            headlight.intensity = 8f;
+            float origIntensity = headlight.intensity;
+            headlight.intensity = origIntensity * 2.5f;
             Invoke(nameof(ResetHeadlight), 0.3f);
         }
 
@@ -153,7 +199,7 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
     private void ResetHeadlight()
     {
-        if (headlight != null) headlight.intensity = 2f;
+        if (headlight != null) headlight.intensity = 3f;
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -185,12 +231,16 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         if (speed < minRamSpeed) return;
 
         int treeLayer = LayerMask.NameToLayer("Tree");
+        GameObject rootObj = target.transform.root.gameObject;
 
-        // Destroy Standalone Tree GameObjects (Prefabs)
-        if (target.layer == treeLayer || target.name.ToLower().Contains("ash") || target.name.ToLower().Contains("birch"))
+        bool isTreeLayer = target.layer == treeLayer || rootObj.layer == treeLayer;
+        string combinedName = (target.name + " " + rootObj.name).ToLower();
+        bool isTreeName = combinedName.Contains("tree") || combinedName.Contains("ash") || combinedName.Contains("birch") || combinedName.Contains("particle_tree");
+
+        if (isTreeLayer || isTreeName)
         {
             TriggerWoodEffects(hitPoint);
-            Destroy(target);
+            Destroy(rootObj);
         }
     }
 
@@ -219,6 +269,8 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         playerObj.transform.position = targetAnchor.position;
         playerObj.transform.rotation = targetAnchor.rotation;
 
+        SetVehicleLights(true);
+        if (audioSource != null) audioSource.Play();
         isDriving = true;
     }
 
@@ -230,16 +282,10 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         currentAccelInput = 0f;
         currentSteerInput = 0f;
 
-        if (backWheelLeft != null)
-        {
-            backWheelLeft.motorTorque = 0f;
-            backWheelLeft.brakeTorque = brakeTorque;
-        }
-        if (backWheelRight != null)
-        {
-            backWheelRight.motorTorque = 0f;
-            backWheelRight.brakeTorque = brakeTorque;
-        }
+        ApplyMotor(0f);
+        ApplyBrakes(brakeTorque);
+        SetVehicleLights(false);
+        if (audioSource != null) audioSource.Stop();
 
         if (playerObj != null)
         {
