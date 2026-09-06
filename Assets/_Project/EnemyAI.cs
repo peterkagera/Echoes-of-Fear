@@ -48,6 +48,10 @@ public class EnemyAI : MonoBehaviour
     private float logTimer = 0f;
     private float footstepTimer = 0f;
 
+    // Desynchronization variables
+    private float currentStepInterval;
+    private float originalBasePitch = 1.0f;
+
     void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
@@ -58,6 +62,9 @@ public class EnemyAI : MonoBehaviour
             anim.applyRootMotion = false;
         }
 
+        // 1. RANDOMIZE SPEED: Vary movement speed slightly per enemy so their cadences naturally drift apart
+        moveSpeed += Random.Range(-0.4f, 0.4f);
+
         if (agent != null)
         {
             agent.speed = moveSpeed;
@@ -66,6 +73,10 @@ public class EnemyAI : MonoBehaviour
             agent.stoppingDistance = 0.8f;
             agent.autoBraking = true;
         }
+
+        // 2. RANDOMIZE STEP TIMERS: Give each enemy instance a unique initial footstep timer and interval jitter
+        footstepTimer = Random.Range(0f, footstepInterval);
+        currentStepInterval = footstepInterval + Random.Range(-0.05f, 0.05f);
     }
 
     void Start()
@@ -77,6 +88,13 @@ public class EnemyAI : MonoBehaviour
         }
 
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
+        if (audioSource != null) originalBasePitch = audioSource.pitch;
+
+        // 3. RANDOMIZE ANIMATION PHASE: Offset walking animation start frame
+        if (anim != null)
+        {
+            anim.Play(0, -1, Random.Range(0f, 1f));
+        }
 
         SetState(AIState.Dormant);
     }
@@ -92,22 +110,31 @@ public class EnemyAI : MonoBehaviour
             anim.SetBool("isWalking", isMoving);
         }
 
+        // --- FOOTSTEP SOUND DESYNCHRONIZATION FIX ---
         if (isMoving && footstepSFX != null && footstepSFX.Length > 0)
         {
             footstepTimer += Time.deltaTime;
-            if (footstepTimer >= footstepInterval)
+            if (footstepTimer >= currentStepInterval)
             {
                 footstepTimer = 0f;
+
+                // Vary step timing jitter per step so they don't stay locked in rhythm
+                currentStepInterval = footstepInterval + Random.Range(-0.06f, 0.06f);
+
                 AudioClip randomStep = footstepSFX[Random.Range(0, footstepSFX.Length)];
                 if (audioSource != null && randomStep != null)
                 {
-                    audioSource.PlayOneShot(randomStep, 0.7f);
+                    // Randomize pitch and volume per footstep to make individuals sound unique
+                    audioSource.pitch = originalBasePitch * Random.Range(0.88f, 1.12f);
+                    float randomVolume = Random.Range(0.55f, 0.75f);
+                    audioSource.PlayOneShot(randomStep, randomVolume);
                 }
             }
         }
         else
         {
-            footstepTimer = footstepInterval;
+            // Instead of instant frame-0 triggers when starting to walk, set a randomized start delay
+            footstepTimer = Random.Range(0f, footstepInterval * 0.6f);
         }
 
         float distToPlayer = Vector3.Distance(transform.position, player.position);
@@ -231,9 +258,8 @@ public class EnemyAI : MonoBehaviour
         if (isJumpscaring) return;
         isJumpscaring = true;
 
-        // Optional: Snap enemy to face player's direction and pull closer (0.6m away)
         Vector3 directionToPlayer = (player.position - transform.position).normalized;
-        directionToPlayer.y = 0; // Keep horizontal alignment
+        directionToPlayer.y = 0;
         transform.rotation = Quaternion.LookRotation(directionToPlayer);
         transform.position = player.position - (directionToPlayer * 0.6f);
 

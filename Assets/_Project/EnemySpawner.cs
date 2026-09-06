@@ -66,7 +66,7 @@ public class EnemySpawner : MonoBehaviour
 
         while (spawnedCount < totalEnemiesToSpawn)
         {
-            yield return new WaitForSeconds(spawnInterval);
+            yield return new WaitForSeconds(spawnInterval + Random.Range(-0.5f, 0.5f));
 
             if (enemyPrefab == null || playerTransform == null) continue;
 
@@ -118,7 +118,6 @@ public class EnemySpawner : MonoBehaviour
             agent.Warp(targetPos);
         }
 
-        // Restore renderers cleanly once warp is confirmed
         if (renderers != null)
         {
             for (int i = 0; i < renderers.Length; i++)

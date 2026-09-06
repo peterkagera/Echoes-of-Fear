@@ -166,6 +166,19 @@ public class SonarPingController : MonoBehaviour
             sonarLight.enabled = true;
             sonarLight.range = lightHeightOffset * lightRangeMultiplier;
             sonarLight.intensity = maxLightIntensity * 0.6f;
+
+            // Enforce soft shadow resolution parameters for elongated shadow projections
+            sonarLight.shadows = LightShadows.Soft;
+            sonarLight.shadowStrength = 1.0f;
+            sonarLight.shadowBias = 0.05f;
+            sonarLight.shadowNormalBias = 0.4f;
+            sonarLight.shadowNearPlane = 0.2f;
+        }
+
+        // Trigger full-screen Retinal After-Burn frame capture
+        if (RetinalAfterBurn.Instance != null)
+        {
+            RetinalAfterBurn.Instance.CaptureAfterBurn();
         }
 
         EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
