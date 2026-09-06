@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 1736422306455415600}
   - component: {fileID: 566207862809466173}
   - component: {fileID: 8292399860706508676}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Birch7_LOD0
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -101,7 +101,7 @@ GameObject:
   - component: {fileID: 8901931037561046839}
   - component: {fileID: 7335014678993798350}
   - component: {fileID: 4614747394647025415}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Leaves_LOD0
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -192,7 +192,7 @@ GameObject:
   - component: {fileID: 8144565834541084969}
   - component: {fileID: 5436215408234839522}
   - component: {fileID: 1554182314701018831}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: Birch_7_Terrain
   m_TagString: Untagged
   m_Icon: {fileID: 0}

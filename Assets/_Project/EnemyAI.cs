@@ -137,7 +137,9 @@ public class EnemyAI : MonoBehaviour
             footstepTimer = Random.Range(0f, footstepInterval * 0.6f);
         }
 
-        float distToPlayer = Vector3.Distance(transform.position, player.position);
+        Vector3 enemyPosXZ = new Vector3(transform.position.x, 0f, transform.position.z);
+        Vector3 playerPosXZ = new Vector3(player.position.x, 0f, player.position.z);
+        float distToPlayer = Vector3.Distance(enemyPosXZ, playerPosXZ);
 
         if (enableDiagnostics)
         {
