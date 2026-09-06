@@ -31,9 +31,6 @@
 # They also could contain extremely sensitive data
 /[Mm]emoryCaptures/
 
-# Unity profiler captures can exceed GitHub's file size limit
-/[Pp]rofiler[Cc]aptures/
-
 # Recordings can get excessive in size
 /[Rr]ecordings/
 

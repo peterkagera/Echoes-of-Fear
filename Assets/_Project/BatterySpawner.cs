@@ -6,6 +6,8 @@ public class BatterySpawner : MonoBehaviour
 {
     public static BatterySpawner Instance { get; private set; }
 
+    public int CollectedBatteries => totalBatteries - remainingBatteries;
+
     [Header("Spawn Settings")]
     public GameObject batteryPrefab;
     public int totalBatteries = 20;

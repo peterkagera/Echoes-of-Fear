@@ -252,6 +252,14 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
     private void EnterVehicle()
     {
+        // Check if player has collected at least 2 batteries via BatterySpawner
+        int collectedBatteries = BatterySpawner.Instance != null ? BatterySpawner.Instance.CollectedBatteries : 0;
+        if (collectedBatteries < 2)
+        {
+            Debug.Log($"Engine won't start! Scavenged {collectedBatteries}/2 required batteries.");
+            return;
+        }
+
         playerObj = GameObject.FindGameObjectWithTag("Player");
         if (playerObj == null) return;
 
