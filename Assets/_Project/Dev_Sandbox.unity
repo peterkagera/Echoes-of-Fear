@@ -687,7 +687,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JumpscareManager
   mainCamera: {fileID: 1404390610}
-  headHeightOffset: 1.8
+  headHeightOffset: 1.5
   snapToFaceSpeed: 20
   jumpscareDuration: 2.5
   shakeIntensity: 0.12
@@ -4757,7 +4757,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 1265252676121343232, guid: 067443df608b8e6419e1c060168313f2, type: 3}
       propertyPath: m_Name
-      value: Low_Poly_Auto_Rickshaw_Yellow
+      value: TukTuk
       objectReference: {fileID: 0}
     - target: {fileID: 1265252676121343232, guid: 067443df608b8e6419e1c060168313f2, type: 3}
       propertyPath: m_Layer
@@ -7500,6 +7500,7 @@ GameObject:
   - component: {fileID: 613352687}
   - component: {fileID: 613352689}
   - component: {fileID: 613352688}
+  - component: {fileID: 613352690}
   m_Layer: 2
   m_Name: SonarOverlay
   m_TagString: Untagged
@@ -7723,6 +7724,27 @@ Light:
   m_LightUnit: 1
   m_LuxAtDistance: 1
   m_EnableSpotReflector: 1
+--- !u!114 &613352690
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 613352682}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ca676dd2bbdfcd343941ea19528322cb, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SonarBatteryGuide
+  sonarKey: 113
+  maxSonarRange: 120
+  cooldownTime: 3
+  arrowUI: {fileID: 1736433954}
+  arrowDisplayDuration: 2
+  audioSource: {fileID: 0}
+  sonarPingSFX: {fileID: 0}
+  minPingPitch: 0.8
+  maxPingPitch: 1.8
 --- !u!1001 &618872930
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -9397,7 +9419,16 @@ MonoBehaviour:
   maxX: 380
   minZ: 80
   maxZ: 380
-  treeExclusionRadius: 3.5
+  roadRunsAlongZ: 1
+  roadXPosition: 174
+  roadZPosition: 174
+  roadExclusionRadius: 45
+  roadLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  roadTag: Road
+  minDistanceFromTree: 2
+  maxDistanceFromTree: 6
   minDistanceBetweenBatteries: 15
   obstacleCheckRadius: 1.2
   obstacleLayers:
@@ -9415,7 +9446,7 @@ Transform:
   m_GameObject: {fileID: 701374570}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 371.2619, y: -0.00002, z: 220.12283}
+  m_LocalPosition: {x: 155, y: -0.00002, z: 264}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -17004,6 +17035,7 @@ RectTransform:
   - {fileID: 1993185513}
   - {fileID: 798238025}
   - {fileID: 232078704}
+  - {fileID: 1736433954}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
@@ -17164,9 +17196,9 @@ Light:
   m_Type: 0
   m_Color: {r: 1, g: 0.7058824, b: 0, a: 1}
   m_Intensity: 300
-  m_Range: 20
-  m_SpotAngle: 60
-  m_InnerSpotAngle: 40
+  m_Range: 200
+  m_SpotAngle: 120
+  m_InnerSpotAngle: 45.49244
   m_CookieSize2D: {x: 0.5, y: 0.5}
   m_Shadows:
     m_Type: 0
@@ -17255,7 +17287,7 @@ Transform:
   m_GameObject: {fileID: 1309493687}
   serializedVersion: 2
   m_LocalRotation: {x: 0.17364816, y: 0, z: 0, w: 0.9848078}
-  m_LocalPosition: {x: -0, y: 0.83, z: 1.266}
+  m_LocalPosition: {x: 0, y: 0.83, z: 2.17}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -21901,7 +21933,7 @@ Light:
   serializedVersion: 12
   m_Type: 0
   m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_Intensity: 25
+  m_Intensity: 50
   m_Range: 25
   m_SpotAngle: 45
   m_InnerSpotAngle: 20
@@ -23563,6 +23595,81 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8902286055551659032, guid: a1784d193c11cfa4c80ab70576e9b489, type: 3}
   m_PrefabInstance: {fileID: 1731201111}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1736433953
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1736433954}
+  - component: {fileID: 1736433956}
+  - component: {fileID: 1736433955}
+  m_Layer: 5
+  m_Name: SonarArrow
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &1736433954
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1736433953}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 1270954952}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 0}
+  m_SizeDelta: {x: 64, y: 64}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!114 &1736433955
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1736433953}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 0}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 1
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 10915, guid: 0000000000000000f000000000000000, type: 0}
+  m_Type: 0
+  m_PreserveAspect: 0
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!222 &1736433956
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1736433953}
+  m_CullTransparentMesh: 1
 --- !u!1001 &1742597779
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -25620,12 +25727,17 @@ MonoBehaviour:
   brakeTorque: 25000
   idleBrakeTorque: 8000
   maxSteerAngle: 30
+  minSteerAngleAtSpeed: 12
   steerSpeed: 120
   centerOfMassOffset: {x: 0, y: -0.6, z: 0}
+  antiRollForce: 12000
+  downforce: 150
   headlight: {fileID: 0}
   pathLight: {fileID: 1309493688}
   cabLight: {fileID: 1974791647}
   audioSource: {fileID: 1845080582}
+  engineNoiseRadius: 60
+  noiseBroadcastInterval: 0.8
   minRamSpeed: 0.5
   splinterPrefab: {fileID: 0}
   woodSnapSound: {fileID: 0}
@@ -29409,6 +29521,10 @@ PrefabInstance:
     - target: {fileID: 9097362319851172643, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
       propertyPath: far clip plane
       value: 1000
+      objectReference: {fileID: 0}
+    - target: {fileID: 9097362319851172643, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
+      propertyPath: near clip plane
+      value: 0.2
       objectReference: {fileID: 0}
     - target: {fileID: 9097362319851172643, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
       propertyPath: m_BackGroundColor.b

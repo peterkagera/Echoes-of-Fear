@@ -13,6 +13,7 @@ public class FlashlightController : MonoBehaviour
     [SerializeField] private Slider batterySlider;
 
     public float CurrentBattery { get; private set; }
+    public bool IsOn => isOn;
 
     private void Start()
     {
@@ -23,7 +24,6 @@ public class FlashlightController : MonoBehaviour
             flashlightSpot.enabled = isOn;
         }
 
-        // Initialize slider properties
         if (batterySlider != null)
         {
             batterySlider.minValue = 0f;
@@ -39,10 +39,8 @@ public class FlashlightController : MonoBehaviour
             CurrentBattery -= drainRate * Time.deltaTime;
             CurrentBattery = Mathf.Clamp(CurrentBattery, 0f, maxBattery);
 
-            // Update UI Slider each frame while draining
             UpdateUI();
 
-            // Turn off when battery empties
             if (CurrentBattery <= 0f)
             {
                 isOn = false;

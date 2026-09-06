@@ -3,22 +3,55 @@ using UnityEngine;
 public class ExtractionGate : MonoBehaviour
 {
     [Header("UI Setup")]
-    public GameObject winCanvasUI; // Drag your victory/game over canvas here
+    public GameObject winCanvasUI;
+
+    [Header("Victory Requirements")]
+    public int requiredBatteries = 15;
 
     private void OnTriggerEnter(Collider other)
     {
-        bool isPlayerOnFoot = other.CompareTag("Player");
-        bool isVehicle = other.GetComponentInParent<TukTukVehicle>() != null;
-
-        if (isPlayerOnFoot || isVehicle)
+        if (other.CompareTag("Player"))
         {
-            if (winCanvasUI != null)
+            // Check if player has collected enough batteries
+            if (BatterySpawner.Instance != null)
             {
-                winCanvasUI.SetActive(true);
+                if (BatterySpawner.Instance.CollectedBatteries >= requiredBatteries)
+                {
+                    TriggerVictory();
+                }
+                else
+                {
+                    Debug.Log($"Gate locked! Collected {BatterySpawner.Instance.CollectedBatteries}/{requiredBatteries} batteries.");
+                }
             }
+            else
+            {
+                // Fallback if spawner doesn't exist
+                TriggerVictory();
+            }
+        }
+    }
 
-            Time.timeScale = 0f; // Pause game logic on win
-            Debug.Log("ESCAPED! YOU WIN!");
+    public void TriggerVictory()
+    {
+        // 1. Show the Victory Screen UI
+        if (winCanvasUI != null)
+        {
+            winCanvasUI.SetActive(true);
+        }
+
+        // 2. Unlock and show the mouse cursor for UI interaction
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible = true;
+
+        // 3. Pause game time
+        Time.timeScale = 0f;
+
+        // 4. Disable player movement/looking
+        PlayerController player = FindAnyObjectByType<PlayerController>();
+        if (player != null)
+        {
+            player.enabled = false;
         }
     }
 }

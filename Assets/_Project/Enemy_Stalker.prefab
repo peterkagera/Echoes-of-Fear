@@ -80,8 +80,8 @@ NavMeshAgent:
   m_AutoRepath: 1
   m_Height: 1.8
   m_BaseOffset: 0
-  m_WalkableMask: 4294967295
-  m_ObstacleAvoidanceType: 1
+  m_WalkableMask: 5
+  m_ObstacleAvoidanceType: 3
 --- !u!114 &4013032837400610468
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -98,10 +98,10 @@ MonoBehaviour:
   obstacleMask:
     serializedVersion: 2
     m_Bits: 1
-  headTransform: {fileID: 0}
+  headTransform: {fileID: 4688538270300931373}
   moveSpeed: 3.5
   maxChaseDistance: 45
-  killDistance: 1
+  killDistance: 1.2
   eyeLevelOffset: 2
   detectionRange: 15
   searchDuration: 5
@@ -300,5 +300,10 @@ PrefabInstance:
 --- !u!4 &4688538270300931287 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 400170, guid: abfe6fc5a9b390a488839c1fc3b58dcd, type: 3}
+  m_PrefabInstance: {fileID: 4688538270300807165}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &4688538270300931373 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: 400080, guid: abfe6fc5a9b390a488839c1fc3b58dcd, type: 3}
   m_PrefabInstance: {fileID: 4688538270300807165}
   m_PrefabAsset: {fileID: 0}

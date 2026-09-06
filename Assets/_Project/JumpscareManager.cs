@@ -13,7 +13,7 @@ public class JumpscareManager : MonoBehaviour
     [SerializeField] private float jumpscareDuration = 2.0f;
 
     [Header("Camera Shake Settings")]
-    [SerializeField] private float shakeIntensity = 0.1f;
+    [SerializeField] private float shakeIntensity = 0.06f;
     [SerializeField] private float shakeFrequency = 30f;
 
     [Header("Audio & UI")]
@@ -32,30 +32,49 @@ public class JumpscareManager : MonoBehaviour
         else Destroy(gameObject);
     }
 
+    private void Start()
+    {
+        if (mainCamera == null) mainCamera = Camera.main;
+    }
+
     public void TriggerJumpscare(Transform attackingEnemy, Transform headTarget = null)
     {
         if (AudioManager.Instance != null)
         {
             AudioManager.Instance.StopAmbience();
         }
+
         if (isJumpscareActive) return;
         isJumpscareActive = true;
 
-        // 1. Disable player movement and look scripts completely
+        // 1. Stop vehicle operation
+        TukTukVehicle vehicle = FindFirstObjectByType<TukTukVehicle>();
+        if (vehicle != null)
+        {
+            vehicle.OnPlayerKilled();
+        }
+
+        // 2. Disable Player movement & Camera look scripts
         if (playerController == null)
         {
             playerController = FindFirstObjectByType<PlayerController>();
         }
-
         if (playerController != null)
         {
             playerController.enabled = false;
         }
 
+        // Disable any standalone camera look components attached to camera or player
+        MonoBehaviour[] camScripts = mainCamera.GetComponents<MonoBehaviour>();
+        foreach (MonoBehaviour script in camScripts)
+        {
+            if (script != this) script.enabled = false;
+        }
+
         CharacterController playerCC = FindFirstObjectByType<CharacterController>();
         if (playerCC != null) playerCC.enabled = false;
 
-        // 2. Freeze attacking enemy physics & NavMeshAgent
+        // 3. Freeze attacking enemy physics
         NavMeshAgent attackingAgent = attackingEnemy.GetComponent<NavMeshAgent>();
         if (attackingAgent != null)
         {
@@ -74,7 +93,6 @@ public class JumpscareManager : MonoBehaviour
             enemyRB.linearVelocity = Vector3.zero;
         }
 
-        // 3. Freeze animator speed so movement frames stop immediately
         Animator enemyAnim = attackingEnemy.GetComponentInChildren<Animator>();
         if (enemyAnim != null)
         {
@@ -83,16 +101,13 @@ public class JumpscareManager : MonoBehaviour
             enemyAnim.speed = 0f;
         }
 
-        // 4. Deactivate all secondary enemies in the scene
         CleanUpOtherEnemies(attackingEnemy);
 
-        // 5. Play audio
         if (audioSource != null && jumpscareSound != null)
         {
             audioSource.PlayOneShot(jumpscareSound);
         }
 
-        // 6. Begin camera sequence
         StartCoroutine(JumpscareSequence(attackingEnemy, headTarget));
     }
 
@@ -114,32 +129,26 @@ public class JumpscareManager : MonoBehaviour
         Vector3 initialCamLocalPos = mainCamera.transform.localPosition;
         float elapsedTime = 0f;
 
-        // Auto-detect Head bone, ignoring IK bones near floor level
-        if (headTarget == null)
+        // Calculate face position relative to enemy base to avoid rig scale glitches
+        Vector3 faceTargetPos = enemyTransform.position + (Vector3.up * headHeightOffset);
+
+        if (headTarget != null)
         {
-            Transform[] children = enemyTransform.GetComponentsInChildren<Transform>();
-            foreach (Transform child in children)
+            float relativeBoneHeight = headTarget.position.y - enemyTransform.position.y;
+            // Only use bone position if within realistic height bounds (1.0m to 2.2m)
+            if (relativeBoneHeight >= 1.0f && relativeBoneHeight <= 2.2f)
             {
-                string boneName = child.name.ToLower();
-                if ((boneName.Contains("head") || boneName.Contains("neck")) &&
-                    child.position.y > (enemyTransform.position.y + 0.8f))
-                {
-                    headTarget = child;
-                    break;
-                }
+                faceTargetPos = headTarget.position;
             }
         }
 
         while (elapsedTime < jumpscareDuration)
         {
-            Vector3 targetHeadPos = (headTarget != null)
-                ? headTarget.position
-                : enemyTransform.position + (Vector3.up * headHeightOffset);
+            Vector3 directionToFace = (faceTargetPos - mainCamera.transform.position).normalized;
 
-            Vector3 directionToHead = (targetHeadPos - mainCamera.transform.position).normalized;
-            if (directionToHead != Vector3.zero)
+            if (directionToFace != Vector3.zero)
             {
-                Quaternion targetRotation = Quaternion.LookRotation(directionToHead);
+                Quaternion targetRotation = Quaternion.LookRotation(directionToFace);
                 mainCamera.transform.rotation = Quaternion.Slerp(
                     mainCamera.transform.rotation,
                     targetRotation,
@@ -147,6 +156,7 @@ public class JumpscareManager : MonoBehaviour
                 );
             }
 
+            // Apply camera shake
             float shakeX = (Mathf.PerlinNoise(Time.time * shakeFrequency, 0f) - 0.5f) * 2f * shakeIntensity;
             float shakeY = (Mathf.PerlinNoise(0f, Time.time * shakeFrequency) - 0.5f) * 2f * shakeIntensity;
             mainCamera.transform.localPosition = initialCamLocalPos + new Vector3(shakeX, shakeY, 0f);

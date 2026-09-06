@@ -15,17 +15,27 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
     [Header("Vehicle Physics")]
     public float motorTorque = 9000f;
-    public float brakeTorque = 25000f;      // Strong brake force
-    public float idleBrakeTorque = 8000f;   // Strong drag on release
+    public float brakeTorque = 25000f;
+    public float idleBrakeTorque = 8000f;
     public float maxSteerAngle = 42f;
-    public float steerSpeed = 120f;         // Fast turn rate
-    public Vector3 centerOfMassOffset = new Vector3(0f, -0.8f, 0f);
+    public float minSteerAngleAtSpeed = 12f;
+    public float steerSpeed = 120f;
+    public Vector3 centerOfMassOffset = new Vector3(0f, -1.2f, 0f);
+
+    [Header("Stability & Anti-Roll Settings")]
+    public float antiRollForce = 12000f;
+    public float downforce = 150f;
 
     [Header("Path & Headlight Vision")]
     public Light headlight;
     public Light pathLight;
     public Light cabLight;
     public AudioSource audioSource;
+
+    [Header("Engine Noise Detection")]
+    public float engineNoiseRadius = 60f;
+    public float noiseBroadcastInterval = 0.8f;
+    private float noiseTimer = 0f;
 
     [Header("Tree Battering Ram")]
     public float minRamSpeed = 0.5f;
@@ -52,7 +62,7 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
             rb.interpolation = RigidbodyInterpolation.Interpolate;
             rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
             rb.linearDamping = 0.15f;
-            rb.angularDamping = 2.0f;
+            rb.angularDamping = 4.0f;
         }
 
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
@@ -72,6 +82,13 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         if (enterCooldown > 0f) enterCooldown -= Time.deltaTime;
 
         if (!isDriving) return;
+
+        noiseTimer += Time.deltaTime;
+        if (noiseTimer >= noiseBroadcastInterval)
+        {
+            noiseTimer = 0f;
+            AlertNearbyEnemies(transform.position, engineNoiseRadius);
+        }
 
         currentSteerInput = 0f;
         currentAccelInput = 0f;
@@ -100,7 +117,12 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
     {
         if (!isDriving || rb == null) return;
 
-        float targetSteerAngle = currentSteerInput * maxSteerAngle;
+        float forwardSpeedMps = rb.linearVelocity.magnitude;
+        float speedRatio = Mathf.Clamp01(forwardSpeedMps / 15f);
+        float dynamicMaxSteer = Mathf.Lerp(maxSteerAngle, minSteerAngleAtSpeed, speedRatio);
+
+        float targetSteerAngle = currentSteerInput * dynamicMaxSteer;
+
         if (frontWheel != null)
         {
             frontWheel.steerAngle = Mathf.MoveTowards(
@@ -114,29 +136,87 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
         if (currentAccelInput > 0f)
         {
-            if (forwardSpeed < -0.5f)
-            {
-                ApplyBrakes(brakeTorque);
-            }
-            else
-            {
-                ApplyMotor(currentAccelInput * motorTorque);
-            }
+            if (forwardSpeed < -0.5f) ApplyBrakes(brakeTorque);
+            else ApplyMotor(currentAccelInput * motorTorque);
         }
         else if (currentAccelInput < 0f)
         {
-            if (forwardSpeed > 0.5f)
-            {
-                ApplyBrakes(brakeTorque);
-            }
-            else
-            {
-                ApplyMotor(currentAccelInput * motorTorque);
-            }
+            if (forwardSpeed > 0.5f) ApplyBrakes(brakeTorque);
+            else ApplyMotor(currentAccelInput * motorTorque);
         }
         else
         {
             ApplyBrakes(idleBrakeTorque);
+        }
+
+        ApplyAntiRollBar();
+        ApplyDownforce();
+    }
+
+    public void OnPlayerKilled()
+    {
+        isDriving = false;
+        currentAccelInput = 0f;
+        currentSteerInput = 0f;
+
+        ApplyMotor(0f);
+        ApplyBrakes(brakeTorque);
+        SetVehicleLights(false);
+
+        if (audioSource != null && audioSource.isPlaying)
+        {
+            audioSource.Stop();
+        }
+
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.isKinematic = true;
+        }
+    }
+
+    private void ApplyAntiRollBar()
+    {
+        if (backWheelLeft == null || backWheelRight == null) return;
+
+        WheelHit hitLeft;
+        WheelHit hitRight;
+
+        bool groundedLeft = backWheelLeft.GetGroundHit(out hitLeft);
+        bool groundedRight = backWheelRight.GetGroundHit(out hitRight);
+
+        float travelLeft = 1.0f;
+        float travelRight = 1.0f;
+
+        if (groundedLeft)
+        {
+            travelLeft = (-backWheelLeft.transform.InverseTransformPoint(hitLeft.point).y - backWheelLeft.radius) / backWheelLeft.suspensionDistance;
+        }
+
+        if (groundedRight)
+        {
+            travelRight = (-backWheelRight.transform.InverseTransformPoint(hitRight.point).y - backWheelRight.radius) / backWheelRight.suspensionDistance;
+        }
+
+        float antiRollForceAmount = (travelLeft - travelRight) * antiRollForce;
+
+        if (groundedLeft)
+        {
+            rb.AddForceAtPosition(transform.up * -antiRollForceAmount, backWheelLeft.transform.position);
+        }
+
+        if (groundedRight)
+        {
+            rb.AddForceAtPosition(transform.up * antiRollForceAmount, backWheelRight.transform.position);
+        }
+    }
+
+    private void ApplyDownforce()
+    {
+        if (rb != null)
+        {
+            rb.AddForce(-transform.up * downforce * rb.linearVelocity.magnitude);
         }
     }
 
@@ -202,6 +282,15 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         if (headlight != null) headlight.intensity = 3f;
     }
 
+    private void AlertNearbyEnemies(Vector3 soundPosition, float radius)
+    {
+        EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
+        foreach (EnemyAI enemy in enemies)
+        {
+            enemy.AlertToSound(soundPosition, radius / Mathf.Max(1f, enemy.detectionRange));
+        }
+    }
+
     private void OnCollisionEnter(Collision collision)
     {
         Vector3 hitPoint = collision.contacts.Length > 0 ? collision.contacts[0].point : transform.position;
@@ -252,7 +341,6 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
     private void EnterVehicle()
     {
-        // Check if player has collected at least 2 batteries via BatterySpawner
         int collectedBatteries = BatterySpawner.Instance != null ? BatterySpawner.Instance.CollectedBatteries : 0;
         if (collectedBatteries < 2)
         {
