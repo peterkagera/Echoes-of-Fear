@@ -61,8 +61,13 @@ public class BatterySpawner : MonoBehaviour
         if (Instance != null && Instance != this)
         {
             Destroy(Instance.gameObject);
+            return;
         }
         Instance = this;
+
+        // Mobile performance caps: Target 60 FPS and scale resolution down to ~1080p
+        Application.targetFrameRate = 60;
+        QualitySettings.resolutionScalingFixedDPIFactor = 0.65f;
     }
 
     private void Start()

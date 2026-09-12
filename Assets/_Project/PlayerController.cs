@@ -6,13 +6,11 @@ public class PlayerController : MonoBehaviour
 {
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 5.0f;
-    [SerializeField] private float lookSensitivity = 1.0f;
+    [SerializeField] private float lookSensitivity = 120.0f; // Increased default sensitivity for joysticks
     [SerializeField] private float gravity = -9.81f;
 
     [Header("Footstep Settings")]
     [SerializeField] private float footstepInterval = 0.45f;
-    //[Range(0f, 2f)]
-    //[SerializeField] private float footstepVolume = 1.0f;
     private float footstepTimer = 0f;
 
     [Header("References")]
@@ -27,8 +25,8 @@ public class PlayerController : MonoBehaviour
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible = false;
+        // Cursor.lockState = CursorLockMode.Locked;
+        // Cursor.visible = false;
     }
 
     private void Start()
@@ -40,8 +38,12 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
-        HandleLook();
         HandleMovement();
+    }
+
+    private void LateUpdate()
+    {
+        HandleLook(); // Moved to LateUpdate to eliminate camera jitter
     }
 
     public void OnMove(InputValue value)
@@ -99,8 +101,9 @@ public class PlayerController : MonoBehaviour
 
     private void HandleLook()
     {
-        float mouseX = lookInput.x * lookSensitivity * 0.1f;
-        float mouseY = lookInput.y * lookSensitivity * 0.1f;
+        // Scaled using Time.deltaTime without the 0.1f reduction factor
+        float mouseX = lookInput.x * lookSensitivity * Time.deltaTime;
+        float mouseY = lookInput.y * lookSensitivity * Time.deltaTime;
 
         cameraPitch -= mouseY;
         cameraPitch = Mathf.Clamp(cameraPitch, -89f, 89f);
