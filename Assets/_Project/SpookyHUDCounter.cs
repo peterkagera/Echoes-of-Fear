@@ -6,19 +6,19 @@ using TMPro;
 public class SpookyHUDCounter : MonoBehaviour
 {
     private TextMeshProUGUI textMesh;
-
-    // Glowing Horror Colors
-    private Color baseColor = new Color(0.85f, 0.15f, 0.15f, 1f); // Blood Red
-    private Color glitchColor = new Color(1f, 0.4f, 0.1f, 0.8f); // Ember Glow
+    private Color baseColor = new Color(0.85f, 0.15f, 0.15f, 1f);
+    private Color glitchColor = new Color(1f, 0.4f, 0.1f, 0.8f);
 
     private int currentCount = 15;
     private int maxCount = 15;
     private Vector3 initialScale;
+    private Vector3 lastAppliedScale;
 
     private void Awake()
     {
         textMesh = GetComponent<TextMeshProUGUI>();
         initialScale = transform.localScale;
+        lastAppliedScale = initialScale;
     }
 
     private void Start()
@@ -45,25 +45,19 @@ public class SpookyHUDCounter : MonoBehaviour
     {
         while (true)
         {
-            // Trigger glitch every 2 to 4 seconds
             yield return new WaitForSeconds(Random.Range(2f, 4.2f));
-
             if (textMesh == null) continue;
 
             float duration = Random.Range(0.12f, 0.35f);
             float elapsed = 0f;
-
             while (elapsed < duration)
             {
-                // Twitch color and horizontal margin
                 textMesh.color = (Random.value > 0.4f) ? glitchColor : baseColor;
                 textMesh.margin = new Vector4(Random.Range(-4f, 4f), Random.Range(-1f, 1f), 0, 0);
-
                 elapsed += Time.deltaTime;
                 yield return null;
             }
 
-            // Reset positioning
             textMesh.color = baseColor;
             textMesh.margin = Vector4.zero;
         }
@@ -71,12 +65,19 @@ public class SpookyHUDCounter : MonoBehaviour
 
     private IEnumerator PulseRoutine()
     {
-        // Subtle breathing effect for horror atmosphere
         while (true)
         {
             float scaleOffset = Mathf.Sin(Time.time * 2.5f) * 0.03f;
-            transform.localScale = initialScale + new Vector3(scaleOffset, scaleOffset, 0f);
-            yield return null;
+            Vector3 targetScale = initialScale + new Vector3(scaleOffset, scaleOffset, 0f);
+
+            // Avoid dirtying UI canvas layout unless scale changed significantly
+            if ((targetScale - lastAppliedScale).sqrMagnitude > 0.0001f)
+            {
+                transform.localScale = targetScale;
+                lastAppliedScale = targetScale;
+            }
+
+            yield return new WaitForSeconds(0.05f); // Updated at 20fps instead of per-frame
         }
     }
 }

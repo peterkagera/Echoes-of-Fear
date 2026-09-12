@@ -28,7 +28,7 @@ public class EnemyAI : MonoBehaviour
     public float footstepInterval = 0.45f;
 
     [Header("Diagnostics")]
-    public bool enableDiagnostics = true;
+    public bool enableDiagnostics = false;
 
     private NavMeshAgent agent;
     private Animator anim;
@@ -42,6 +42,12 @@ public class EnemyAI : MonoBehaviour
     private float footstepTimer = 0f;
     private float currentStepInterval;
     private float originalBasePitch = 1.0f;
+
+    // Cached squared distances to eliminate Sqrt calculations in Update()
+    private float killDistanceSqr;
+    private float detectionRangeSqr;
+    private float maxChaseDistanceSqr;
+    private const float NEARBY_DETECTION_SQR = 25.0f; // 5.0f * 5.0f
 
     void Awake()
     {
@@ -64,6 +70,15 @@ public class EnemyAI : MonoBehaviour
 
         footstepTimer = Random.Range(0f, footstepInterval);
         currentStepInterval = footstepInterval + Random.Range(-0.05f, 0.05f);
+
+        CacheSquaredDistances();
+    }
+
+    private void CacheSquaredDistances()
+    {
+        killDistanceSqr = killDistance * killDistance;
+        detectionRangeSqr = detectionRange * detectionRange;
+        maxChaseDistanceSqr = maxChaseDistance * maxChaseDistance;
     }
 
     void Start()
@@ -116,9 +131,12 @@ public class EnemyAI : MonoBehaviour
             footstepTimer = Random.Range(0f, footstepInterval * 0.6f);
         }
 
-        Vector3 enemyPosXZ = new Vector3(transform.position.x, 0f, transform.position.z);
-        Vector3 playerPosXZ = new Vector3(player.position.x, 0f, player.position.z);
-        float distToPlayer = Vector3.Distance(enemyPosXZ, playerPosXZ);
+        // Fast 2D squared distance calculation without Mathf.Sqrt
+        Vector3 enemyPos = transform.position;
+        Vector3 playerPos = player.position;
+        float dx = enemyPos.x - playerPos.x;
+        float dz = enemyPos.z - playerPos.z;
+        float sqrDistToPlayer = (dx * dx) + (dz * dz);
 
         if (enableDiagnostics)
         {
@@ -126,11 +144,11 @@ public class EnemyAI : MonoBehaviour
             if (logTimer >= 2.0f)
             {
                 logTimer = 0f;
-                Debug.Log($"[{gameObject.name}] State={currentState} | Dist={distToPlayer:F1}m | Speed={agent.velocity.magnitude:F1}m/s | HasPath={agent.hasPath}", this);
+                Debug.Log($"[{gameObject.name}] State={currentState} | Dist={Mathf.Sqrt(sqrDistToPlayer):F1}m | Speed={agent.velocity.magnitude:F1}m/s | HasPath={agent.hasPath}", this);
             }
         }
 
-        if (distToPlayer <= killDistance)
+        if (sqrDistToPlayer <= killDistanceSqr)
         {
             TriggerJumpscare();
             return;
@@ -154,7 +172,7 @@ public class EnemyAI : MonoBehaviour
                     }
                 }
 
-                if (distToPlayer <= 5.0f || (distToPlayer <= detectionRange && HasLineOfSight()))
+                if (sqrDistToPlayer <= NEARBY_DETECTION_SQR || (sqrDistToPlayer <= detectionRangeSqr && HasLineOfSight()))
                 {
                     SetState(AIState.ChasingPlayer);
                 }
@@ -168,7 +186,7 @@ public class EnemyAI : MonoBehaviour
                     SetTargetPosition(player.position);
                 }
 
-                if (distToPlayer > maxChaseDistance)
+                if (sqrDistToPlayer > maxChaseDistanceSqr)
                 {
                     lastKnownPlayerPos = player.position;
                     searchTimer = 0f;
@@ -177,7 +195,7 @@ public class EnemyAI : MonoBehaviour
                 break;
 
             case AIState.SearchingSound:
-                if (distToPlayer <= detectionRange && HasLineOfSight())
+                if (sqrDistToPlayer <= detectionRangeSqr && HasLineOfSight())
                 {
                     SetState(AIState.ChasingPlayer);
                     return;
@@ -198,11 +216,14 @@ public class EnemyAI : MonoBehaviour
     public bool HasLineOfSight()
     {
         if (player == null) return false;
+
         Vector3 eyePos = transform.position + (Vector3.up * eyeLevelOffset);
         Vector3 targetEyePos = player.position + (Vector3.up * eyeLevelOffset);
         Vector3 dir = (targetEyePos - eyePos).normalized;
 
-        if (Physics.Raycast(eyePos, dir, out RaycastHit hit, detectionRange, ~0, QueryTriggerInteraction.Ignore))
+        int mask = (obstacleMask.value != 0) ? obstacleMask.value : ~0;
+
+        if (Physics.Raycast(eyePos, dir, out RaycastHit hit, detectionRange, mask, QueryTriggerInteraction.Ignore))
         {
             return hit.transform.IsChildOf(player) || hit.transform == player;
         }
@@ -212,6 +233,7 @@ public class EnemyAI : MonoBehaviour
     public void AlertToSound(Vector3 soundPosition, float volume)
     {
         if (isJumpscaring || currentState == AIState.ChasingPlayer) return;
+
         float distToSound = Vector3.Distance(transform.position, soundPosition);
         if (distToSound <= detectionRange * volume)
         {
@@ -232,6 +254,7 @@ public class EnemyAI : MonoBehaviour
     public void SetState(AIState newState)
     {
         if (isJumpscaring || currentState == newState) return;
+
         if (enableDiagnostics)
         {
             Debug.Log($"[{gameObject.name}] State Change: {currentState} -> {newState}", this);
@@ -273,7 +296,6 @@ public class EnemyAI : MonoBehaviour
         if (isJumpscaring) return;
         isJumpscaring = true;
 
-        // Stop audio & AI on ALL active enemies in scene upon player death
         EnemyAI[] allEnemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
         foreach (EnemyAI enemy in allEnemies)
         {
@@ -288,12 +310,10 @@ public class EnemyAI : MonoBehaviour
         transform.rotation = Quaternion.LookRotation(directionToPlayer);
 
         Vector3 targetKillPos = player.position - (directionToPlayer * killDistance);
-
         if (Physics.Raycast(targetKillPos + Vector3.up * 2f, Vector3.down, out RaycastHit groundHit, 6f, ~0, QueryTriggerInteraction.Ignore))
         {
             targetKillPos.y = groundHit.point.y;
         }
-
         transform.position = targetKillPos;
 
         if (anim != null)

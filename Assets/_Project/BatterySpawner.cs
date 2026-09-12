@@ -20,7 +20,7 @@ public class BatterySpawner : MonoBehaviour
     public int guaranteedNearbyCount = 2;
     public float nearbyMinRadius = 6f;
     public float nearbyMaxRadius = 18f;
-    public float treeClearanceForStarter = 3.5f; // Ensures starter batteries spawn in open ground
+    public float treeClearanceForStarter = 3.5f;
 
     [Header("Playable Map Bounds")]
     public float minX = 80f;
@@ -50,11 +50,12 @@ public class BatterySpawner : MonoBehaviour
     public TextMeshProUGUI batteryCountText;
 
     [Header("Debug Visuals")]
-    public bool drawDebugGizmos = true;
+    public bool drawDebugGizmos = false;
 
-    private List<GameObject> activeBatteries = new List<GameObject>();
-    private List<Vector3> cachedTreePositions = new List<Vector3>();
+    private readonly List<GameObject> activeBatteries = new List<GameObject>();
+    private readonly List<Vector3> cachedTreePositions = new List<Vector3>();
     private int remainingBatteries = 0;
+    private SpookyHUDCounter spookyUI;
 
     private void Awake()
     {
@@ -65,7 +66,7 @@ public class BatterySpawner : MonoBehaviour
         }
         Instance = this;
 
-        // Mobile performance caps: Target 60 FPS and scale resolution down to ~1080p
+        // Mobile performance caps
         Application.targetFrameRate = 60;
         QualitySettings.resolutionScalingFixedDPIFactor = 0.65f;
     }
@@ -73,11 +74,15 @@ public class BatterySpawner : MonoBehaviour
     private void Start()
     {
         if (terrain == null) terrain = Terrain.activeTerrain;
-
         if (playerTransform == null)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
             if (playerObj != null) playerTransform = playerObj.transform;
+        }
+
+        if (batteryCountText != null)
+        {
+            spookyUI = batteryCountText.GetComponent<SpookyHUDCounter>();
         }
 
         CollectedBatteries = 0;
@@ -97,13 +102,11 @@ public class BatterySpawner : MonoBehaviour
     private void CollectAllTrees()
     {
         cachedTreePositions.Clear();
-
         if (terrain != null && terrain.terrainData != null)
         {
             Vector3 terrainPos = terrain.transform.position;
             Vector3 terrainSize = terrain.terrainData.size;
             TreeInstance[] trees = terrain.terrainData.treeInstances;
-
             foreach (TreeInstance tree in trees)
             {
                 Vector3 worldPos = Vector3.Scale(tree.position, terrainSize) + terrainPos;
@@ -128,65 +131,57 @@ public class BatterySpawner : MonoBehaviour
 
         activeBatteries.Clear();
 
-        // 1. Ensure Player Reference exists
         if (playerTransform == null)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-            if (playerObj != null)
-            {
-                playerTransform = playerObj.transform;
-            }
-        }
-
-        if (playerTransform == null)
-        {
-            Debug.LogError("[BatterySpawner] COULD NOT FIND PLAYER! Make sure your Player object has the tag 'Player' assigned.");
-        }
-        else
-        {
-            Debug.Log($"[BatterySpawner] Player found at position: {playerTransform.position}");
+            if (playerObj != null) playerTransform = playerObj.transform;
         }
 
         int successfullySpawned = 0;
 
-        // 2. Guaranteed Starter Batteries Placement
-        int startersToSpawn = (playerTransform != null) ? guaranteedNearbyCount : 0;
-        for (int i = 0; i < startersToSpawn; i++)
+        // 1. Guaranteed Starter Batteries right in front of the player view
+        if (playerTransform != null)
         {
-            // Place one slightly to the left, one to the right in front of the player
-            float sideOffset = (i == 0) ? -4f : 4f;
-            Vector3 starterPos = playerTransform.position + (playerTransform.forward * 10f) + (playerTransform.right * sideOffset);
+            int startersToSpawn = Mathf.Min(guaranteedNearbyCount, totalBatteries);
+            Vector3 playerForward = playerTransform.forward;
+            Vector3 playerRight = playerTransform.right;
 
-            if (terrain != null)
+            for (int i = 0; i < startersToSpawn; i++)
             {
-                float terrainY = terrain.SampleHeight(starterPos);
-                starterPos.y = terrain.transform.position.y + terrainY + spawnHeightOffset;
-            }
-            else
-            {
-                starterPos.y = playerTransform.position.y;
-            }
+                float sideOffset = (i == 0) ? -3.5f : 3.5f;
+                float forwardOffset = 7.0f; // Placed 7 meters directly ahead in view
+                Vector3 starterPos = playerTransform.position + (playerForward * forwardOffset) + (playerRight * sideOffset);
 
-            GameObject starterBattery = Instantiate(batteryPrefab, starterPos, Quaternion.identity);
-            activeBatteries.Add(starterBattery);
-            successfullySpawned++;
-            Debug.Log($"[BatterySpawner] Spawned starter battery {i + 1} at: {starterPos}");
+                if (terrain != null)
+                {
+                    float terrainY = terrain.SampleHeight(starterPos);
+                    starterPos.y = terrain.transform.position.y + terrainY + spawnHeightOffset;
+                }
+                else
+                {
+                    starterPos.y = playerTransform.position.y + spawnHeightOffset;
+                }
+
+                GameObject starterBattery = Instantiate(batteryPrefab, starterPos, Quaternion.identity);
+                activeBatteries.Add(starterBattery);
+                successfullySpawned++;
+            }
         }
 
-        // 3. Spawn remaining hidden map batteries
+        // 2. Spawn remaining hidden map batteries
         int remainingToSpawn = totalBatteries - successfullySpawned;
+        float minDistSqr = minDistanceBetweenBatteries * minDistanceBetweenBatteries;
+
         for (int i = 0; i < remainingToSpawn; i++)
         {
             for (int attempt = 0; attempt < maxSpawnAttempts; attempt++)
             {
-                Vector3 candidatePos = Vector3.zero;
-
+                Vector3 candidatePos;
                 if (cachedTreePositions.Count > 0)
                 {
                     Vector3 randomTree = cachedTreePositions[Random.Range(0, cachedTreePositions.Count)];
                     float angle = Random.Range(0f, Mathf.PI * 2f);
                     float dist = Random.Range(minDistanceFromTree, maxDistanceFromTree);
-
                     candidatePos = new Vector3(randomTree.x + Mathf.Cos(angle) * dist, 0f, randomTree.z + Mathf.Sin(angle) * dist);
                 }
                 else
@@ -194,8 +189,7 @@ public class BatterySpawner : MonoBehaviour
                     candidatePos = new Vector3(Random.Range(minX, maxX), 0f, Random.Range(minZ, maxZ));
                 }
 
-                if (candidatePos.x < minX || candidatePos.x > maxX || candidatePos.z < minZ || candidatePos.z > maxZ)
-                    continue;
+                if (candidatePos.x < minX || candidatePos.x > maxX || candidatePos.z < minZ || candidatePos.z > maxZ) continue;
 
                 if (roadRunsAlongZ)
                 {
@@ -213,14 +207,16 @@ public class BatterySpawner : MonoBehaviour
                 }
 
                 bool tooClose = false;
-                foreach (GameObject b in activeBatteries)
+                for (int bIdx = 0; bIdx < activeBatteries.Count; bIdx++)
                 {
-                    if (b != null && Vector3.Distance(candidatePos, b.transform.position) < minDistanceBetweenBatteries)
+                    GameObject b = activeBatteries[bIdx];
+                    if (b != null && (candidatePos - b.transform.position).sqrMagnitude < minDistSqr)
                     {
                         tooClose = true;
                         break;
                     }
                 }
+
                 if (tooClose) continue;
 
                 GameObject newBattery = Instantiate(batteryPrefab, candidatePos, Quaternion.identity);
@@ -234,24 +230,10 @@ public class BatterySpawner : MonoBehaviour
         UpdateUI();
     }
 
-    private bool IsTooCloseToTrees(Vector3 pos, float minDistance)
-    {
-        Vector2 pos2D = new Vector2(pos.x, pos.z);
-        foreach (Vector3 treePos in cachedTreePositions)
-        {
-            Vector2 tree2D = new Vector2(treePos.x, treePos.z);
-            if (Vector2.Distance(pos2D, tree2D) < minDistance)
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
     public Transform GetClosestBattery(Vector3 originPos, float maxDistance = 150f)
     {
         Transform closest = null;
-        float minDistance = maxDistance;
+        float minSqrDistance = maxDistance * maxDistance;
 
         for (int i = activeBatteries.Count - 1; i >= 0; i--)
         {
@@ -261,10 +243,10 @@ public class BatterySpawner : MonoBehaviour
                 continue;
             }
 
-            float dist = Vector3.Distance(originPos, activeBatteries[i].transform.position);
-            if (dist < minDistance)
+            float sqrDist = (originPos - activeBatteries[i].transform.position).sqrMagnitude;
+            if (sqrDist < minSqrDistance)
             {
-                minDistance = dist;
+                minSqrDistance = sqrDist;
                 closest = activeBatteries[i].transform;
             }
         }
@@ -278,7 +260,6 @@ public class BatterySpawner : MonoBehaviour
         {
             activeBatteries.Remove(batteryObj);
         }
-
         CollectedBatteries++;
         remainingBatteries = Mathf.Max(0, remainingBatteries - 1);
         UpdateUI();
@@ -294,17 +275,15 @@ public class BatterySpawner : MonoBehaviour
 
     private void UpdateUI()
     {
-        if (batteryCountText != null)
+        if (batteryCountText == null) return;
+
+        if (spookyUI != null)
         {
-            SpookyHUDCounter spookyUI = batteryCountText.GetComponent<SpookyHUDCounter>();
-            if (spookyUI != null)
-            {
-                spookyUI.UpdateCount(remainingBatteries, totalBatteries);
-            }
-            else
-            {
-                batteryCountText.text = $"POWER CELLS: {remainingBatteries} / {totalBatteries}";
-            }
+            spookyUI.UpdateCount(remainingBatteries, totalBatteries);
+        }
+        else
+        {
+            batteryCountText.text = $"POWER CELLS: {remainingBatteries} / {totalBatteries}";
         }
     }
 

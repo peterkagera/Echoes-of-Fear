@@ -7,7 +7,6 @@ public class RetinalAfterBurn : MonoBehaviour
     public static RetinalAfterBurn Instance { get; private set; }
 
     [Header("UI Overlay References")]
-    [Tooltip("A full-screen UI RawImage assigned to a Canvas set to Screen Space - Overlay.")]
     [SerializeField] private RawImage afterBurnOverlay;
     [SerializeField] private CanvasGroup overlayCanvasGroup;
 
@@ -26,32 +25,39 @@ public class RetinalAfterBurn : MonoBehaviour
         else Destroy(gameObject);
 
         targetCamera = GetComponent<Camera>();
-
         if (overlayCanvasGroup != null)
         {
             overlayCanvasGroup.alpha = 0f;
             overlayCanvasGroup.blocksRaycasts = false;
         }
+
+        // Pre-allocate downscaled RenderTexture once to eliminate mobile memory thrashing
+        capturedFrame = new RenderTexture(512, 288, 16, RenderTextureFormat.ARGB32);
+    }
+
+    private void OnDestroy()
+    {
+        if (capturedFrame != null)
+        {
+            capturedFrame.Release();
+            Destroy(capturedFrame);
+        }
     }
 
     public void CaptureAfterBurn()
     {
-        if (targetCamera == null || afterBurnOverlay == null) return;
+        if (targetCamera == null || afterBurnOverlay == null || capturedFrame == null) return;
 
         if (activeBurnCoroutine != null)
         {
             StopCoroutine(activeBurnCoroutine);
         }
-
         activeBurnCoroutine = StartCoroutine(RenderAndFadeSequence());
     }
 
     private IEnumerator RenderAndFadeSequence()
     {
         yield return new WaitForEndOfFrame();
-
-        if (capturedFrame != null) capturedFrame.Release();
-        capturedFrame = new RenderTexture(Screen.width, Screen.height, 24, RenderTextureFormat.ARGB32);
 
         targetCamera.targetTexture = capturedFrame;
         targetCamera.Render();
@@ -65,24 +71,16 @@ public class RetinalAfterBurn : MonoBehaviour
         {
             elapsedTime += Time.deltaTime;
             float progress = elapsedTime / burnFadeDuration;
-
             if (overlayCanvasGroup != null)
             {
                 overlayCanvasGroup.alpha = fadeCurve.Evaluate(progress);
             }
-
             yield return null;
         }
 
         if (overlayCanvasGroup != null)
         {
             overlayCanvasGroup.alpha = 0f;
-        }
-
-        if (capturedFrame != null)
-        {
-            capturedFrame.Release();
-            capturedFrame = null;
         }
     }
 }

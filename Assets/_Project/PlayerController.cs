@@ -5,12 +5,15 @@ using UnityEngine.InputSystem;
 public class PlayerController : MonoBehaviour
 {
     [Header("Movement Settings")]
-    [SerializeField] private float moveSpeed = 5.0f;
-    [SerializeField] private float lookSensitivity = 120.0f; // Increased default sensitivity for joysticks
-    [SerializeField] private float gravity = -9.81f;
+    [SerializeField] private float moveSpeed = 7.5f;
+    [SerializeField] private float gravity = -15.0f;
+
+    [Header("Mobile Look Settings")]
+    [Tooltip("Rotation speed in degrees per second when holding joystick at maximum range.")]
+    [SerializeField] private float joystickLookSpeed = 120.0f; // Adjusted for smooth 360 mobile panning
 
     [Header("Footstep Settings")]
-    [SerializeField] private float footstepInterval = 0.45f;
+    [SerializeField] private float footstepInterval = 0.4f;
     private float footstepTimer = 0f;
 
     [Header("References")]
@@ -24,16 +27,23 @@ public class PlayerController : MonoBehaviour
 
     private void Awake()
     {
+        Application.targetFrameRate = 60;
+        QualitySettings.vSyncCount = 0;
+
+#if UNITY_ANDROID && !UNITY_EDITOR
+        int targetWidth = Screen.width / 2;
+        int targetHeight = Screen.height / 2;
+        Screen.SetResolution(targetWidth, targetHeight, true);
+#endif
+
         controller = GetComponent<CharacterController>();
-        // Cursor.lockState = CursorLockMode.Locked;
-        // Cursor.visible = false;
     }
 
     private void Start()
     {
-        // Reset movement values on Start to prevent initial frame physics launch
-        verticalVelocity = 0f;
+        verticalVelocity = -0.5f;
         moveInput = Vector2.zero;
+        lookInput = Vector2.zero;
     }
 
     private void Update()
@@ -43,7 +53,7 @@ public class PlayerController : MonoBehaviour
 
     private void LateUpdate()
     {
-        HandleLook(); // Moved to LateUpdate to eliminate camera jitter
+        HandleLook();
     }
 
     public void OnMove(InputValue value)
@@ -58,27 +68,32 @@ public class PlayerController : MonoBehaviour
 
     private void HandleMovement()
     {
-        // Cap deltaTime to max 0.05s to prevent massive movement spikes during frame hitches
-        float safeDeltaTime = Mathf.Min(Time.deltaTime, 0.05f);
+        float safeDeltaTime = Time.deltaTime > 0.05f ? 0.05f : Time.deltaTime;
 
         if (controller.isGrounded)
         {
             if (verticalVelocity < 0)
             {
-                verticalVelocity = -2f;
+                verticalVelocity = -0.75f;
             }
         }
+        else
+        {
+            verticalVelocity += gravity * safeDeltaTime;
+        }
 
-        Vector3 move = transform.right * moveInput.x + transform.forward * moveInput.y;
-        verticalVelocity += gravity * safeDeltaTime;
+        Vector3 move = (transform.right * moveInput.x) + (transform.forward * moveInput.y);
+        if (move.sqrMagnitude > 1f)
+        {
+            move.Normalize();
+        }
 
         Vector3 velocity = (move * moveSpeed) + (Vector3.up * verticalVelocity);
         controller.Move(velocity * safeDeltaTime);
 
-        // Footstep timing check
         if (controller.isGrounded && moveInput.sqrMagnitude > 0.01f)
         {
-            footstepTimer += Time.deltaTime;
+            footstepTimer += safeDeltaTime;
             if (footstepTimer >= footstepInterval)
             {
                 TriggerFootstepSound();
@@ -93,17 +108,19 @@ public class PlayerController : MonoBehaviour
 
     private void TriggerFootstepSound()
     {
-        if (AudioManager.Instance != null)
-        {
-            AudioManager.Instance.PlayFootstep();
-        }
+        AudioManager.Instance?.PlayFootstep();
     }
 
     private void HandleLook()
     {
-        // Scaled using Time.deltaTime without the 0.1f reduction factor
-        float mouseX = lookInput.x * lookSensitivity * Time.deltaTime;
-        float mouseY = lookInput.y * lookSensitivity * Time.deltaTime;
+        // Stop processing look logic immediately when finger releases handle
+        if (lookInput.sqrMagnitude < 0.001f) return;
+
+        float safeDeltaTime = Time.deltaTime > 0.05f ? 0.05f : Time.deltaTime;
+
+        // Direct linear scaling: lookInput values range from -1.0 to +1.0
+        float mouseX = lookInput.x * joystickLookSpeed * safeDeltaTime;
+        float mouseY = lookInput.y * joystickLookSpeed * safeDeltaTime;
 
         cameraPitch -= mouseY;
         cameraPitch = Mathf.Clamp(cameraPitch, -89f, 89f);
@@ -112,8 +129,7 @@ public class PlayerController : MonoBehaviour
         {
             cameraTransform.localRotation = Quaternion.Euler(cameraPitch, 0f, 0f);
         }
-
-        transform.Rotate(Vector3.up * mouseX);
+        transform.Rotate(0f, mouseX, 0f);
     }
 
     public void UnlockCursor()

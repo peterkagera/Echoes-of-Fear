@@ -35,12 +35,22 @@ public class AudioManager : MonoBehaviour
     private bool isPlayerAlive = true;
     private Transform playerTransform;
     private Transform mainCameraTransform;
-    private EnemyAI targetEnemy;
+
+    // Cache enemy array to avoid scene-wide allocations every step
+    private EnemyAI[] cachedEnemies;
+    private float enemyCacheTimer = 0f;
+    private const float ENEMY_CACHE_INTERVAL = 1.5f;
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        if (Instance == null)
+        {
+            Instance = this;
+        }
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 
     private void Start()
@@ -56,14 +66,12 @@ public class AudioManager : MonoBehaviour
             mainCameraTransform = Camera.main.transform;
         }
 
-        targetEnemy = FindFirstObjectByType<EnemyAI>();
         ResetAmbientTimer();
     }
 
     private void Update()
     {
         if (!isPlayerAlive) return;
-
         HandleAmbientHorror();
     }
 
@@ -80,12 +88,14 @@ public class AudioManager : MonoBehaviour
 
         if (playerTransform != null)
         {
-            EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
+            EnemyAI[] enemies = GetCachedEnemies();
             float noiseRadius = 18f;
-
             foreach (EnemyAI enemy in enemies)
             {
-                enemy.AlertToSound(playerTransform.position, noiseRadius);
+                if (enemy != null && enemy.enabled)
+                {
+                    enemy.AlertToSound(playerTransform.position, noiseRadius);
+                }
             }
         }
     }
@@ -124,15 +134,12 @@ public class AudioManager : MonoBehaviour
         if (ambientSource == null || ambientHorrorClips.Length == 0) return;
 
         AudioClip clip = ambientHorrorClips[Random.Range(0, ambientHorrorClips.Length)];
-
-        // Pitch variation prevents audio monotony
         ambientSource.pitch = Random.Range(0.88f, 1.12f);
 
         if (useDirectionalSpawns && playerTransform != null && mainCameraTransform != null)
         {
-            // Pick a point behind or to the sides of camera view
             Vector3 randomDirection = -mainCameraTransform.forward + (Random.insideUnitSphere * 0.8f);
-            randomDirection.y = 0; // Keep horizontal with player
+            randomDirection.y = 0;
             randomDirection.Normalize();
 
             float spawnDistance = Random.Range(minSpawnDistance, maxSpawnDistance);
@@ -148,12 +155,28 @@ public class AudioManager : MonoBehaviour
     {
         Vector2 activeRange = baseIntervalRange;
 
-        // Ramps up frequency if enemy gets close
-        if (playerTransform != null && targetEnemy != null)
+        if (playerTransform != null)
         {
-            float distToEnemy = Vector3.Distance(playerTransform.position, targetEnemy.transform.position);
-            if (distToEnemy <= panicDistanceThreshold)
+            EnemyAI[] enemies = GetCachedEnemies();
+            float minSqrDist = panicDistanceThreshold * panicDistanceThreshold;
+            bool foundCloseEnemy = false;
+
+            foreach (EnemyAI enemy in enemies)
             {
+                if (enemy != null && enemy.enabled)
+                {
+                    float sqrDist = (playerTransform.position - enemy.transform.position).sqrMagnitude;
+                    if (sqrDist < minSqrDist)
+                    {
+                        minSqrDist = sqrDist;
+                        foundCloseEnemy = true;
+                    }
+                }
+            }
+
+            if (foundCloseEnemy)
+            {
+                float distToEnemy = Mathf.Sqrt(minSqrDist);
                 float tensionFactor = Mathf.Clamp01(distToEnemy / panicDistanceThreshold);
                 activeRange.x = Mathf.Lerp(panicIntervalRange.x, baseIntervalRange.x, tensionFactor);
                 activeRange.y = Mathf.Lerp(panicIntervalRange.y, baseIntervalRange.y, tensionFactor);
@@ -161,5 +184,15 @@ public class AudioManager : MonoBehaviour
         }
 
         ambientTimer = Random.Range(activeRange.x, activeRange.y);
+    }
+
+    private EnemyAI[] GetCachedEnemies()
+    {
+        if (cachedEnemies == null || Time.time - enemyCacheTimer > ENEMY_CACHE_INTERVAL)
+        {
+            cachedEnemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
+            enemyCacheTimer = Time.time;
+        }
+        return cachedEnemies;
     }
 }

@@ -9,13 +9,13 @@ public class PlayerHealth : MonoBehaviour
         if (isDead) return;
         isDead = true;
 
-        // Notify all active AI entities in scene to halt footsteps and AI loops
         EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
-        foreach (EnemyAI enemy in enemies)
+        for (int i = 0; i < enemies.Length; i++)
         {
-            enemy.OnPlayerDeath();
+            if (enemies[i] != null)
+            {
+                enemies[i].OnPlayerDeath();
+            }
         }
-
-        Debug.Log("Player died. All Enemy AI components disabled and footsteps silenced.");
     }
 }

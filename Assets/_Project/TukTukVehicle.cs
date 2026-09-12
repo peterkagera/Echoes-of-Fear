@@ -35,12 +35,16 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
     [Header("Engine Noise Detection")]
     public float engineNoiseRadius = 60f;
     public float noiseBroadcastInterval = 0.8f;
+    public LayerMask enemyLayer;
     private float noiseTimer = 0f;
 
     [Header("Tree Battering Ram")]
     public float minRamSpeed = 0.5f;
     public GameObject splinterPrefab;
     public AudioClip woodSnapSound;
+
+    [Header("Optional Direct References")]
+    [SerializeField] private SonarPingController sonarController;
 
     private bool isDriving = false;
     private float enterCooldown = 0f;
@@ -52,6 +56,9 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
     private float currentSteerInput = 0f;
     private float currentAccelInput = 0f;
+
+    private int treeLayerIndex;
+    private readonly Collider[] enemyHitBuffer = new Collider[16];
 
     private void Start()
     {
@@ -66,8 +73,11 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         }
 
         if (audioSource == null) audioSource = GetComponent<AudioSource>();
+        if (sonarController == null) sonarController = FindAnyObjectByType<SonarPingController>();
 
+        treeLayerIndex = LayerMask.NameToLayer("Tree");
         SetVehicleLights(false);
+        CachePlayerReferences();
     }
 
     public string GetPrompt() => isDriving ? "" : "Drive Tuk-Tuk";
@@ -180,24 +190,11 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
     {
         if (backWheelLeft == null || backWheelRight == null) return;
 
-        WheelHit hitLeft;
-        WheelHit hitRight;
+        bool groundedLeft = backWheelLeft.GetGroundHit(out WheelHit hitLeft);
+        bool groundedRight = backWheelRight.GetGroundHit(out WheelHit hitRight);
 
-        bool groundedLeft = backWheelLeft.GetGroundHit(out hitLeft);
-        bool groundedRight = backWheelRight.GetGroundHit(out hitRight);
-
-        float travelLeft = 1.0f;
-        float travelRight = 1.0f;
-
-        if (groundedLeft)
-        {
-            travelLeft = (-backWheelLeft.transform.InverseTransformPoint(hitLeft.point).y - backWheelLeft.radius) / backWheelLeft.suspensionDistance;
-        }
-
-        if (groundedRight)
-        {
-            travelRight = (-backWheelRight.transform.InverseTransformPoint(hitRight.point).y - backWheelRight.radius) / backWheelRight.suspensionDistance;
-        }
+        float travelLeft = groundedLeft ? (-backWheelLeft.transform.InverseTransformPoint(hitLeft.point).y - backWheelLeft.radius) / backWheelLeft.suspensionDistance : 1.0f;
+        float travelRight = groundedRight ? (-backWheelRight.transform.InverseTransformPoint(hitRight.point).y - backWheelRight.radius) / backWheelRight.suspensionDistance : 1.0f;
 
         float antiRollForceAmount = (travelLeft - travelRight) * antiRollForce;
 
@@ -265,15 +262,14 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
     {
         if (headlight != null)
         {
-            float origIntensity = headlight.intensity;
-            headlight.intensity = origIntensity * 2.5f;
+            headlight.intensity *= 2.5f;
+            CancelInvoke(nameof(ResetHeadlight));
             Invoke(nameof(ResetHeadlight), 0.3f);
         }
 
-        GameObject sonarObj = GameObject.Find("SonarOverlay");
-        if (sonarObj != null)
+        if (sonarController != null)
         {
-            sonarObj.SendMessage("TriggerPulse", SendMessageOptions.DontRequireReceiver);
+            sonarController.TriggerPing();
         }
     }
 
@@ -284,16 +280,20 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
     private void AlertNearbyEnemies(Vector3 soundPosition, float radius)
     {
-        EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
-        foreach (EnemyAI enemy in enemies)
+        int count = Physics.OverlapSphereNonAlloc(soundPosition, radius, enemyHitBuffer, enemyLayer);
+        for (int i = 0; i < count; i++)
         {
-            enemy.AlertToSound(soundPosition, radius / Mathf.Max(1f, enemy.detectionRange));
+            if (enemyHitBuffer[i] != null && enemyHitBuffer[i].TryGetComponent(out EnemyAI enemy))
+            {
+                enemy.AlertToSound(soundPosition, radius / Mathf.Max(1f, enemy.detectionRange));
+            }
         }
     }
 
     private void OnCollisionEnter(Collision collision)
     {
-        Vector3 hitPoint = collision.contacts.Length > 0 ? collision.contacts[0].point : transform.position;
+        // Zero GC allocation contact point retrieval
+        Vector3 hitPoint = collision.contactCount > 0 ? collision.GetContact(0).point : transform.position;
         CheckAndDestroyTree(collision.gameObject, hitPoint);
     }
 
@@ -319,14 +319,13 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
         if (speed < minRamSpeed) return;
 
-        int treeLayer = LayerMask.NameToLayer("Tree");
         GameObject rootObj = target.transform.root.gameObject;
 
-        bool isTreeLayer = target.layer == treeLayer || rootObj.layer == treeLayer;
-        string combinedName = (target.name + " " + rootObj.name).ToLower();
-        bool isTreeName = combinedName.Contains("tree") || combinedName.Contains("ash") || combinedName.Contains("birch") || combinedName.Contains("particle_tree");
+        // Perform fast layer and tag checks instead of dynamic string concatenation
+        bool isTree = target.layer == treeLayerIndex || rootObj.layer == treeLayerIndex ||
+                     target.CompareTag("Tree") || rootObj.CompareTag("Tree");
 
-        if (isTreeLayer || isTreeName)
+        if (isTree)
         {
             TriggerWoodEffects(hitPoint);
             Destroy(rootObj);
@@ -339,23 +338,32 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         if (woodSnapSound != null && audioSource != null) audioSource.PlayOneShot(woodSnapSound);
     }
 
+    private void CachePlayerReferences()
+    {
+        if (playerObj == null)
+        {
+            playerObj = GameObject.FindGameObjectWithTag("Player");
+            if (playerObj != null)
+            {
+                playerController = playerObj.GetComponent<CharacterController>();
+                playerMovementScript = playerObj.GetComponent<PlayerController>();
+                playerCollider = playerObj.GetComponent<Collider>();
+            }
+        }
+    }
+
     private void EnterVehicle()
     {
         int collectedBatteries = BatterySpawner.Instance != null ? BatterySpawner.Instance.CollectedBatteries : 0;
         if (collectedBatteries < 2)
         {
-            Debug.Log($"Engine won't start! Scavenged {collectedBatteries}/2 required batteries.");
             return;
         }
 
-        playerObj = GameObject.FindGameObjectWithTag("Player");
+        CachePlayerReferences();
         if (playerObj == null) return;
 
         enterCooldown = 0.3f;
-
-        playerController = playerObj.GetComponent<CharacterController>();
-        playerMovementScript = playerObj.GetComponent<PlayerController>();
-        playerCollider = playerObj.GetComponent<Collider>();
 
         if (playerMovementScript != null) playerMovementScript.enabled = false;
         if (playerController != null) playerController.enabled = false;

@@ -12,21 +12,15 @@ public class ExtractionGate : MonoBehaviour
     {
         if (other.CompareTag("Player"))
         {
-            // Check if player has collected enough batteries
             if (BatterySpawner.Instance != null)
             {
                 if (BatterySpawner.Instance.CollectedBatteries >= requiredBatteries)
                 {
                     TriggerVictory();
                 }
-                else
-                {
-                    Debug.Log($"Gate locked! Collected {BatterySpawner.Instance.CollectedBatteries}/{requiredBatteries} batteries.");
-                }
             }
             else
             {
-                // Fallback if spawner doesn't exist
                 TriggerVictory();
             }
         }
@@ -34,20 +28,16 @@ public class ExtractionGate : MonoBehaviour
 
     public void TriggerVictory()
     {
-        // 1. Show the Victory Screen UI
         if (winCanvasUI != null)
         {
             winCanvasUI.SetActive(true);
         }
 
-        // 2. Unlock and show the mouse cursor for UI interaction
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible = true;
 
-        // 3. Pause game time
         Time.timeScale = 0f;
 
-        // 4. Disable player movement/looking
         PlayerController player = FindAnyObjectByType<PlayerController>();
         if (player != null)
         {

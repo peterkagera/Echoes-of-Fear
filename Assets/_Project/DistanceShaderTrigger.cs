@@ -6,13 +6,28 @@ public class DistanceShaderTrigger : MonoBehaviour
     [SerializeField] private Material targetMaterial;
 
     private static readonly int PlayerPosID = Shader.PropertyToID("_PlayerPosition");
+    private Vector3 lastPosition;
+
+    private void Start()
+    {
+        if (playerTransform == null)
+        {
+            GameObject playerObj = GameObject.FindWithTag("Player");
+            if (playerObj != null) playerTransform = playerObj.transform;
+        }
+    }
 
     private void Update()
     {
         if (playerTransform != null && targetMaterial != null)
         {
-            // Pass the player's world position to the shader graph
-            targetMaterial.SetVector(PlayerPosID, playerTransform.position);
+            Vector3 currentPos = playerTransform.position;
+            // Only send vector to material when player position actually changes
+            if ((currentPos - lastPosition).sqrMagnitude > 0.001f)
+            {
+                targetMaterial.SetVector(PlayerPosID, currentPos);
+                lastPosition = currentPos;
+            }
         }
     }
 }

@@ -1,16 +1,16 @@
 using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.InputSystem; // Added for New Input System
 
 public class SonarBatteryGuide : MonoBehaviour
 {
     [Header("Input & Detection")]
-    public KeyCode sonarKey = KeyCode.Q;
     public float maxSonarRange = 120f;
     public float cooldownTime = 3.0f;
 
     [Header("UI Directional Arrow (Canvas)")]
-    public RectTransform arrowUI; // UI Image Arrow on HUD
+    public RectTransform arrowUI;
     public float arrowDisplayDuration = 2.0f;
 
     [Header("Audio Ping Feedback")]
@@ -21,18 +21,29 @@ public class SonarBatteryGuide : MonoBehaviour
 
     private float nextSonarTime = 0f;
     private Coroutine arrowRoutine;
+    private Transform cachedClosestBattery;
 
-    void Update()
+    private void Update()
     {
-        if (Input.GetKeyDown(sonarKey) && Time.time >= nextSonarTime)
+        // PC Key check (Q key) using the new Input System
+        if (Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame)
+        {
+            TryTriggerSonar();
+        }
+
+        if (arrowUI != null && arrowUI.gameObject.activeInHierarchy && cachedClosestBattery != null)
+        {
+            UpdateArrowRotation();
+        }
+    }
+
+    // Call this from Update (PC) or a Mobile Canvas UI Button OnClick Event
+    public void TryTriggerSonar()
+    {
+        if (Time.time >= nextSonarTime)
         {
             TriggerSonarPulse();
             nextSonarTime = Time.time + cooldownTime;
-        }
-
-        if (arrowUI != null && arrowUI.gameObject.activeInHierarchy)
-        {
-            UpdateArrowRotation();
         }
     }
 
@@ -40,13 +51,11 @@ public class SonarBatteryGuide : MonoBehaviour
     {
         if (BatterySpawner.Instance == null) return;
 
-        Transform closestBattery = BatterySpawner.Instance.GetClosestBattery(transform.position, maxSonarRange);
-
-        if (closestBattery != null)
+        cachedClosestBattery = BatterySpawner.Instance.GetClosestBattery(transform.position, maxSonarRange);
+        if (cachedClosestBattery != null)
         {
-            float distance = Vector3.Distance(transform.position, closestBattery.position);
+            float distance = Vector3.Distance(transform.position, cachedClosestBattery.position);
 
-            // Play Sonar Ping with higher pitch when closer to battery
             if (audioSource != null && sonarPingSFX != null)
             {
                 float proximityPercent = 1f - Mathf.Clamp01(distance / maxSonarRange);
@@ -54,33 +63,28 @@ public class SonarBatteryGuide : MonoBehaviour
                 audioSource.PlayOneShot(sonarPingSFX);
             }
 
-            // Show HUD Arrow pointing toward battery
             if (arrowUI != null)
             {
                 if (arrowRoutine != null) StopCoroutine(arrowRoutine);
-                arrowRoutine = StartCoroutine(ShowArrowRoutine(closestBattery));
+                arrowRoutine = StartCoroutine(ShowArrowRoutine());
             }
         }
     }
 
     private void UpdateArrowRotation()
     {
-        if (BatterySpawner.Instance == null) return;
-        Transform closestBattery = BatterySpawner.Instance.GetClosestBattery(transform.position, maxSonarRange);
+        if (cachedClosestBattery == null) return;
 
-        if (closestBattery == null) return;
-
-        Vector3 dirToTarget = (closestBattery.position - transform.position).normalized;
-        Vector3 forward = transform.forward;
-
+        Vector3 dirToTarget = cachedClosestBattery.position - transform.position;
         dirToTarget.y = 0;
+        Vector3 forward = transform.forward;
         forward.y = 0;
 
-        float angle = Vector3.SignedAngle(forward, dirToTarget, Vector3.up);
+        float angle = Vector3.SignedAngle(forward, dirToTarget.normalized, Vector3.up);
         arrowUI.localRotation = Quaternion.Euler(0, 0, -angle);
     }
 
-    private IEnumerator ShowArrowRoutine(Transform targetBattery)
+    private IEnumerator ShowArrowRoutine()
     {
         arrowUI.gameObject.SetActive(true);
         Image img = arrowUI.GetComponent<Image>();
@@ -93,7 +97,6 @@ public class SonarBatteryGuide : MonoBehaviour
             float fadeTime = 0.5f;
             float elapsed = 0f;
             Color initialColor = img.color;
-
             while (elapsed < fadeTime)
             {
                 elapsed += Time.deltaTime;
@@ -103,5 +106,6 @@ public class SonarBatteryGuide : MonoBehaviour
         }
 
         arrowUI.gameObject.SetActive(false);
+        cachedClosestBattery = null;
     }
 }
