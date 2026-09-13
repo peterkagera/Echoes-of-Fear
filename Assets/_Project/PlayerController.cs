@@ -1,6 +1,10 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
+
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
@@ -8,9 +12,11 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float moveSpeed = 7.5f;
     [SerializeField] private float gravity = -15.0f;
 
-    [Header("Mobile Look Settings")]
-    [Tooltip("Rotation speed in degrees per second when holding joystick at maximum range.")]
-    [SerializeField] private float joystickLookSpeed = 120.0f; // Adjusted for smooth 360 mobile panning
+    [Header("Look Settings")]
+    [Tooltip("Rotation speed in degrees per second when using touch joysticks.")]
+    [SerializeField] private float joystickLookSpeed = 120.0f;
+    [Tooltip("Sensitivity multiplier when testing with a PC Mouse in the Game view.")]
+    [SerializeField] private float mouseSensitivity = 0.15f;
 
     [Header("Footstep Settings")]
     [SerializeField] private float footstepInterval = 0.4f;
@@ -18,12 +24,14 @@ public class PlayerController : MonoBehaviour
 
     [Header("References")]
     [SerializeField] private Transform cameraTransform;
+    [SerializeField] private GameObject mobileControlsCanvas;
 
     private CharacterController controller;
     private Vector2 moveInput;
     private Vector2 lookInput;
     private float cameraPitch = 0.0f;
     private float verticalVelocity;
+    private bool isUsingSimulator = false;
 
     private void Awake()
     {
@@ -44,16 +52,58 @@ public class PlayerController : MonoBehaviour
         verticalVelocity = -0.5f;
         moveInput = Vector2.zero;
         lookInput = Vector2.zero;
+
+        // Initialize state for Editor or Android Device
+#if !UNITY_EDITOR
+        SetMobileMode(true);
+#else
+        isUsingSimulator = UnityEngine.Device.SystemInfo.deviceType == DeviceType.Handheld;
+        SetMobileMode(isUsingSimulator);
+#endif
     }
 
     private void Update()
     {
+#if UNITY_EDITOR
+        UpdateControlMode();
+#endif
         HandleMovement();
     }
 
     private void LateUpdate()
     {
         HandleLook();
+    }
+
+#if UNITY_EDITOR
+    private void UpdateControlMode()
+    {
+        // UnityEngine.Device API dynamically detects Handheld (Simulator) vs Desktop (Game view)
+        bool simulatorActive = UnityEngine.Device.SystemInfo.deviceType == DeviceType.Handheld;
+
+        if (simulatorActive != isUsingSimulator)
+        {
+            isUsingSimulator = simulatorActive;
+            SetMobileMode(isUsingSimulator);
+        }
+    }
+#endif
+
+    private void SetMobileMode(bool mobileActive)
+    {
+        if (mobileControlsCanvas != null)
+        {
+            mobileControlsCanvas.SetActive(mobileActive);
+        }
+
+        if (mobileActive)
+        {
+            UnlockCursor();
+        }
+        else
+        {
+            LockCursor();
+        }
     }
 
     public void OnMove(InputValue value)
@@ -113,14 +163,25 @@ public class PlayerController : MonoBehaviour
 
     private void HandleLook()
     {
-        // Stop processing look logic immediately when finger releases handle
         if (lookInput.sqrMagnitude < 0.001f) return;
 
         float safeDeltaTime = Time.deltaTime > 0.05f ? 0.05f : Time.deltaTime;
+        float mouseX, mouseY;
 
-        // Direct linear scaling: lookInput values range from -1.0 to +1.0
-        float mouseX = lookInput.x * joystickLookSpeed * safeDeltaTime;
-        float mouseY = lookInput.y * joystickLookSpeed * safeDeltaTime;
+#if UNITY_EDITOR
+        if (!isUsingSimulator)
+        {
+            // Game View: Raw Mouse Delta calculation
+            mouseX = lookInput.x * mouseSensitivity;
+            mouseY = lookInput.y * mouseSensitivity;
+        }
+        else
+#endif
+        {
+            // Simulator / Android Device: Joystick continuous output
+            mouseX = lookInput.x * joystickLookSpeed * safeDeltaTime;
+            mouseY = lookInput.y * joystickLookSpeed * safeDeltaTime;
+        }
 
         cameraPitch -= mouseY;
         cameraPitch = Mathf.Clamp(cameraPitch, -89f, 89f);

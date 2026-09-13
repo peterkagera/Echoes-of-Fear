@@ -30405,6 +30405,10 @@ PrefabInstance:
       propertyPath: lookSensitivity
       value: 220
       objectReference: {fileID: 0}
+    - target: {fileID: 847750963064917410, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
+      propertyPath: mobileControlsCanvas
+      value: 
+      objectReference: {fileID: 717186467}
     - target: {fileID: 2654344871261881994, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
       propertyPath: m_RenderShadows
       value: 0
