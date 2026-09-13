@@ -98,6 +98,19 @@ InitTestScene*.unity*
 /[Aa]ssets/Addressables_Temp*
 # By default, Addressables content builds will generate addressables_content_state.bin
 # files in platform-specific subfolders, for example:
+
+# Recovery and temporary files
+/Assets/_Recovery/
+
+# Tutorial and sample assets
+/Assets/UnityTechnologies/
+
+# TextMesh Pro sample and inline icon assets
+/Assets/TextMesh\ Pro/Resources/Sprite\ Assets/InlineIcons*
+/Assets/TextMesh\ Pro/Resources/Sprite\ Assets/MixedIndexTest*
+
+# ProGrids configuration
+/ProjectSettings/Packages/com.unity.progrids/
 # /Assets/AddressableAssetsData/OSX/addressables_content_state.bin
 /[Aa]ssets/AddressableAssetsData/*/*.bin*
 
