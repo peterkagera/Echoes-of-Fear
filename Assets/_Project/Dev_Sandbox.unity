@@ -1727,6 +1727,53 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8902286055551659032, guid: a1784d193c11cfa4c80ab70576e9b489, type: 3}
   m_PrefabInstance: {fileID: 130675751}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &160793667
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 160793668}
+  - component: {fileID: 160793669}
+  m_Layer: 0
+  m_Name: PerformanceManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &160793668
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 160793667}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 2909.344, y: 185.9778, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &160793669
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 160793667}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2cce022e668e2d14d9ddfd53d7cf0c9b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MobilePerformanceManager
+  targetFPS: 60
+  targetDpiFactor: 0.7
+  mobileShadowDistance: 25
 --- !u!1 &162973976
 GameObject:
   m_ObjectHideFlags: 0
@@ -4975,7 +5022,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2563682934040196757, guid: 067443df608b8e6419e1c060168313f2, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 174.17
+      value: 171.89
       objectReference: {fileID: 0}
     - target: {fileID: 2563682934040196757, guid: 067443df608b8e6419e1c060168313f2, type: 3}
       propertyPath: m_LocalPosition.y
@@ -4983,7 +5030,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2563682934040196757, guid: 067443df608b8e6419e1c060168313f2, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 253.9
+      value: 259.14
       objectReference: {fileID: 0}
     - target: {fileID: 2563682934040196757, guid: 067443df608b8e6419e1c060168313f2, type: 3}
       propertyPath: m_LocalRotation.w
@@ -7827,7 +7874,6 @@ MonoBehaviour:
   playerTransform: {fileID: 1096360761}
   sonarRenderer: {fileID: 613352684}
   sonarLight: {fileID: 613352689}
-  mainCamera: {fileID: 1404390610}
   maxRadius: 50
   pulseSpeed: 15
   maxLightIntensity: 40
@@ -7837,9 +7883,6 @@ MonoBehaviour:
   batteryLayer:
     serializedVersion: 2
     m_Bits: 256
-  batteryBlipIcon: {fileID: 0}
-  blipColor: {r: 0, g: 1, b: 1, a: 1}
-  blipDisplayDuration: 2
 --- !u!114 &613352688
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -7946,7 +7989,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ca676dd2bbdfcd343941ea19528322cb, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::SonarBatteryGuide
-  sonarKey: 113
   maxSonarRange: 120
   cooldownTime: 3
   arrowUI: {fileID: 1736433954}
@@ -9468,7 +9510,19 @@ MonoBehaviour:
   m_TargetGraphic: {fileID: 688555310}
   m_OnClick:
     m_PersistentCalls:
-      m_Calls: []
+      m_Calls:
+      - m_Target: {fileID: 613352690}
+        m_TargetAssemblyTypeName: SonarBatteryGuide, Assembly-CSharp
+        m_MethodName: TryTriggerSonar
+        m_Mode: 1
+        m_Arguments:
+          m_ObjectArgument: {fileID: 0}
+          m_ObjectArgumentAssemblyTypeName: UnityEngine.Object, UnityEngine
+          m_IntArgument: 0
+          m_FloatArgument: 0
+          m_StringArgument: 
+          m_BoolArgument: 0
+        m_CallState: 2
 --- !u!114 &688555310
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -12803,8 +12857,9 @@ GameObject:
   - component: {fileID: 928839414}
   - component: {fileID: 928839417}
   - component: {fileID: 928839416}
+  - component: {fileID: 928839418}
   m_Layer: 5
-  m_Name: Handle
+  m_Name: RightHandle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -12867,6 +12922,41 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 928839413}
   m_CullTransparentMesh: 1
+--- !u!114 &928839418
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 928839413}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9d677f1681015749b15c436eec6d880, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.OnScreen.OnScreenStick
+  m_MovementRange: 50
+  m_DynamicOriginRange: 100
+  m_ControlPath: <Gamepad>/rightStick
+  m_Behaviour: 1
+  m_UseIsolatedInputActions: 0
+  m_PointerDownAction:
+    m_Name: 
+    m_Type: 0
+    m_ExpectedControlType: 
+    m_Id: 0ef70702-55e8-4ecd-8ff2-e73b72c9b299
+    m_Processors: 
+    m_Interactions: 
+    m_SingletonActionBindings: []
+    m_Flags: 0
+  m_PointerMoveAction:
+    m_Name: 
+    m_Type: 0
+    m_ExpectedControlType: 
+    m_Id: 40b57b62-c156-4c96-8d52-7e3a60a450c5
+    m_Processors: 
+    m_Interactions: 
+    m_SingletonActionBindings: []
+    m_Flags: 0
 --- !u!1001 &933617327
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -15552,7 +15642,7 @@ GameObject:
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
-  m_StaticEditorFlags: 2147483647
+  m_StaticEditorFlags: 126
   m_IsActive: 1
 --- !u!154 &1091264808
 TerrainCollider:
@@ -15584,25 +15674,25 @@ Terrain:
   m_Enabled: 1
   serializedVersion: 6
   m_TerrainData: {fileID: 15600000, guid: c2f763e7ed278244b8427fe3db1ebf89, type: 2}
-  m_TreeDistance: 150
-  m_TreeBillboardDistance: 150
+  m_TreeDistance: 50
+  m_TreeBillboardDistance: 50
   m_TreeCrossFadeLength: 5
   m_TreeMaximumFullLODCount: 50
   m_DetailObjectDistance: 15
   m_DetailObjectDensity: 0.05
   m_HeightmapPixelError: 5
-  m_SplatMapDistance: 1000
+  m_SplatMapDistance: 100
   m_HeightmapMinimumLODSimplification: 0
   m_HeightmapMaximumLOD: 0
-  m_ShadowCastingMode: 2
+  m_ShadowCastingMode: 0
   m_DrawHeightmap: 1
-  m_DrawInstanced: 0
+  m_DrawInstanced: 1
   m_DrawTreesAndFoliage: 1
   m_StaticShadowCaster: 0
   m_IgnoreQualitySettings: 0
-  m_ReflectionProbeUsage: 1
+  m_ReflectionProbeUsage: 0
   m_MaterialTemplate: {fileID: 2100000, guid: 594ea882c5a793440b60ff72d896021e, type: 2}
-  m_BakeLightProbesForTrees: 1
+  m_BakeLightProbesForTrees: 0
   m_PreserveTreePrototypeLayers: 0
   m_DeringLightProbesForTrees: 1
   m_ReceiveGI: 1
@@ -15611,7 +15701,7 @@ Terrain:
   m_GroupingID: 0
   m_RenderingLayerMask: 1
   m_AllowAutoConnect: 1
-  m_EnableHeightmapRayTracing: 1
+  m_EnableHeightmapRayTracing: 0
   m_EnableTreesAndDetailsRayTracing: 0
   m_EnableHeightmapLODFrustumCulling: 1
   m_TreeMotionVectorModeOverride: 3
@@ -20350,7 +20440,6 @@ GameObject:
   - component: {fileID: 1476000257}
   - component: {fileID: 1476000260}
   - component: {fileID: 1476000259}
-  - component: {fileID: 1476000261}
   m_Layer: 5
   m_Name: LookJoystick
   m_TagString: Untagged
@@ -20416,41 +20505,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1476000256}
   m_CullTransparentMesh: 1
---- !u!114 &1476000261
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1476000256}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e9d677f1681015749b15c436eec6d880, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.OnScreen.OnScreenStick
-  m_MovementRange: 50
-  m_DynamicOriginRange: 100
-  m_ControlPath: <Gamepad>/rightStick
-  m_Behaviour: 0
-  m_UseIsolatedInputActions: 0
-  m_PointerDownAction:
-    m_Name: 
-    m_Type: 0
-    m_ExpectedControlType: 
-    m_Id: 0ef70702-55e8-4ecd-8ff2-e73b72c9b299
-    m_Processors: 
-    m_Interactions: 
-    m_SingletonActionBindings: []
-    m_Flags: 0
-  m_PointerMoveAction:
-    m_Name: 
-    m_Type: 0
-    m_ExpectedControlType: 
-    m_Id: 40b57b62-c156-4c96-8d52-7e3a60a450c5
-    m_Processors: 
-    m_Interactions: 
-    m_SingletonActionBindings: []
-    m_Flags: 0
 --- !u!1 &1477328661
 GameObject:
   m_ObjectHideFlags: 0
@@ -22589,7 +22643,6 @@ GameObject:
   - component: {fileID: 1628596739}
   - component: {fileID: 1628596742}
   - component: {fileID: 1628596741}
-  - component: {fileID: 1628596743}
   m_Layer: 5
   m_Name: MovementJoystick
   m_TagString: Untagged
@@ -22655,41 +22708,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1628596738}
   m_CullTransparentMesh: 1
---- !u!114 &1628596743
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1628596738}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: e9d677f1681015749b15c436eec6d880, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.OnScreen.OnScreenStick
-  m_MovementRange: 50
-  m_DynamicOriginRange: 100
-  m_ControlPath: <Gamepad>/leftStick
-  m_Behaviour: 0
-  m_UseIsolatedInputActions: 0
-  m_PointerDownAction:
-    m_Name: 
-    m_Type: 0
-    m_ExpectedControlType: 
-    m_Id: f690ba8b-b019-48f7-93a1-64ac9575e4f4
-    m_Processors: 
-    m_Interactions: 
-    m_SingletonActionBindings: []
-    m_Flags: 0
-  m_PointerMoveAction:
-    m_Name: 
-    m_Type: 0
-    m_ExpectedControlType: 
-    m_Id: ce7a1803-57e1-40a1-a77d-ccf57a4de4dc
-    m_Processors: 
-    m_Interactions: 
-    m_SingletonActionBindings: []
-    m_Flags: 0
 --- !u!1 &1638072425
 GameObject:
   m_ObjectHideFlags: 0
@@ -26568,9 +26586,13 @@ MonoBehaviour:
   audioSource: {fileID: 1845080582}
   engineNoiseRadius: 60
   noiseBroadcastInterval: 0.8
+  enemyLayer:
+    serializedVersion: 2
+    m_Bits: 0
   minRamSpeed: 0.5
   splinterPrefab: {fileID: 0}
   woodSnapSound: {fileID: 0}
+  sonarController: {fileID: 0}
 --- !u!54 &1845080580
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -27497,8 +27519,9 @@ GameObject:
   - component: {fileID: 1904434764}
   - component: {fileID: 1904434767}
   - component: {fileID: 1904434766}
+  - component: {fileID: 1904434768}
   m_Layer: 5
-  m_Name: Handle
+  m_Name: LeftHandle
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -27561,6 +27584,41 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1904434763}
   m_CullTransparentMesh: 1
+--- !u!114 &1904434768
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1904434763}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e9d677f1681015749b15c436eec6d880, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.OnScreen.OnScreenStick
+  m_MovementRange: 50
+  m_DynamicOriginRange: 100
+  m_ControlPath: <Gamepad>/leftStick
+  m_Behaviour: 1
+  m_UseIsolatedInputActions: 0
+  m_PointerDownAction:
+    m_Name: 
+    m_Type: 0
+    m_ExpectedControlType: 
+    m_Id: f690ba8b-b019-48f7-93a1-64ac9575e4f4
+    m_Processors: 
+    m_Interactions: 
+    m_SingletonActionBindings: []
+    m_Flags: 0
+  m_PointerMoveAction:
+    m_Name: 
+    m_Type: 0
+    m_ExpectedControlType: 
+    m_Id: ce7a1803-57e1-40a1-a77d-ccf57a4de4dc
+    m_Processors: 
+    m_Interactions: 
+    m_SingletonActionBindings: []
+    m_Flags: 0
 --- !u!1 &1910239219
 GameObject:
   m_ObjectHideFlags: 0
@@ -30205,7 +30263,7 @@ MonoBehaviour:
   minDistanceFromPlayer: 15
   spawnRadius: 35
   despawnDistance: 65
-  enableDiagnostics: 1
+  enableDiagnostics: 0
 --- !u!4 &2112283867
 Transform:
   m_ObjectHideFlags: 0
@@ -30345,7 +30403,11 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 847750963064917410, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
       propertyPath: lookSensitivity
-      value: 120
+      value: 220
+      objectReference: {fileID: 0}
+    - target: {fileID: 2654344871261881994, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
+      propertyPath: m_RenderShadows
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2654344871261881994, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
       propertyPath: m_RenderPostProcessing
@@ -30419,6 +30481,14 @@ PrefabInstance:
       propertyPath: m_Center.y
       value: 0.1
       objectReference: {fileID: 0}
+    - target: {fileID: 7237324883207744532, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
+      propertyPath: m_StepOffset
+      value: 0.5
+      objectReference: {fileID: 0}
+    - target: {fileID: 7237324883207744532, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
+      propertyPath: m_MinMoveDistance
+      value: 0
+      objectReference: {fileID: 0}
     - target: {fileID: 7962749985402095939, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
       propertyPath: m_LocalPosition.y
       value: 1
@@ -30486,3 +30556,4 @@ SceneRoots:
   - {fileID: 409883587}
   - {fileID: 731105021}
   - {fileID: 717186471}
+  - {fileID: 160793668}
