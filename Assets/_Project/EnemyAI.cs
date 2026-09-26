@@ -158,7 +158,7 @@ public class EnemyAI : MonoBehaviour
         {
             case AIState.Dormant:
             case AIState.Patrolling:
-                if (agent != null && (!agent.hasPath || agent.remainingDistance <= agent.stoppingDistance))
+                if (agent != null && agent.isOnNavMesh && (!agent.hasPath || agent.remainingDistance <= agent.stoppingDistance))
                 {
                     searchTimer += Time.deltaTime;
                     if (searchTimer >= 3.5f)
@@ -201,7 +201,7 @@ public class EnemyAI : MonoBehaviour
                     return;
                 }
 
-                if (agent != null && !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
+                if (agent != null && agent.isOnNavMesh && !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
                 {
                     searchTimer += Time.deltaTime;
                     if (searchTimer >= searchDuration)
