@@ -22838,7 +22838,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &1638072426
 Transform:
   m_ObjectHideFlags: 0
@@ -24083,7 +24083,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1705381849}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: b753aba128622da48a36520155aae2a1, type: 3}
   m_Name: 
@@ -35364,7 +35364,15 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 2654344871261881994, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
       propertyPath: m_RenderPostProcessing
-      value: 1
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2654344871261881994, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
+      propertyPath: m_RequiresDepthTextureOption
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 2654344871261881994, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
+      propertyPath: m_RequiresOpaqueTextureOption
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: 2886795351578328562, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
       propertyPath: m_LocalPosition.x
@@ -35405,6 +35413,10 @@ PrefabInstance:
     - target: {fileID: 2886795351578328562, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3835874960081136986, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
+      propertyPath: m_NotificationBehavior
+      value: 3
       objectReference: {fileID: 0}
     - target: {fileID: 4600984288466993344, guid: 04287bbf1ac98c242a1946f2bb198535, type: 3}
       propertyPath: m_Name

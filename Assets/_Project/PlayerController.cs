@@ -78,7 +78,6 @@ public class PlayerController : MonoBehaviour
 #if UNITY_EDITOR
     private void UpdateControlMode()
     {
-        // UnityEngine.Device API dynamically detects Handheld (Simulator) vs Desktop (Game view)
         bool simulatorActive = UnityEngine.Device.SystemInfo.deviceType == DeviceType.Handheld;
 
         if (simulatorActive != isUsingSimulator)
@@ -118,8 +117,6 @@ public class PlayerController : MonoBehaviour
 
     private void HandleMovement()
     {
-        float safeDeltaTime = Time.deltaTime > 0.05f ? 0.05f : Time.deltaTime;
-
         if (controller.isGrounded)
         {
             if (verticalVelocity < 0)
@@ -129,7 +126,7 @@ public class PlayerController : MonoBehaviour
         }
         else
         {
-            verticalVelocity += gravity * safeDeltaTime;
+            verticalVelocity += gravity * Time.deltaTime;
         }
 
         Vector3 move = (transform.right * moveInput.x) + (transform.forward * moveInput.y);
@@ -139,11 +136,11 @@ public class PlayerController : MonoBehaviour
         }
 
         Vector3 velocity = (move * moveSpeed) + (Vector3.up * verticalVelocity);
-        controller.Move(velocity * safeDeltaTime);
+        controller.Move(velocity * Time.deltaTime);
 
         if (controller.isGrounded && moveInput.sqrMagnitude > 0.01f)
         {
-            footstepTimer += safeDeltaTime;
+            footstepTimer += Time.deltaTime;
             if (footstepTimer >= footstepInterval)
             {
                 TriggerFootstepSound();
@@ -165,7 +162,6 @@ public class PlayerController : MonoBehaviour
     {
         if (lookInput.sqrMagnitude < 0.001f) return;
 
-        float safeDeltaTime = Time.deltaTime > 0.05f ? 0.05f : Time.deltaTime;
         float mouseX, mouseY;
 
 #if UNITY_EDITOR
@@ -178,9 +174,9 @@ public class PlayerController : MonoBehaviour
         else
 #endif
         {
-            // Simulator / Android Device: Joystick continuous output
-            mouseX = lookInput.x * joystickLookSpeed * safeDeltaTime;
-            mouseY = lookInput.y * joystickLookSpeed * safeDeltaTime;
+            // Simulator / Android Device: Joystick continuous output scaled by smooth deltaTime
+            mouseX = lookInput.x * joystickLookSpeed * Time.deltaTime;
+            mouseY = lookInput.y * joystickLookSpeed * Time.deltaTime;
         }
 
         cameraPitch -= mouseY;
