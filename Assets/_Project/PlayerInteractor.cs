@@ -67,7 +67,7 @@ public class PlayerInteractor : MonoBehaviour
         }
     }
 
-    private void TriggerInteraction()
+    public void TriggerInteraction()
     {
         if (currentInteractable != null)
         {

@@ -80,12 +80,47 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         CachePlayerReferences();
     }
 
-    public string GetPrompt() => isDriving ? "" : "Drive Tuk-Tuk";
+    public string GetPrompt()
+    {
+        if (isDriving)
+        {
+#if UNITY_ANDROID || UNITY_IOS
+            return "Tap to Exit";
+#else
+        return "Press E: Exit Tuk-Tuk";
+#endif
+        }
+
+#if UNITY_ANDROID || UNITY_IOS
+        return "Tap to Drive Tuk-Tuk";
+#else
+    return "Press E: Drive Tuk-Tuk";
+#endif
+    }
 
     public void Interact()
     {
-        if (!isDriving && enterCooldown <= 0f) EnterVehicle();
+        if (enterCooldown > 0f) return;
+
+        if (!isDriving)
+        {
+            EnterVehicle();
+        }
+        else
+        {
+            ExitVehicle();
+        }
     }
+
+    public void SetDriveInput(Vector2 input)
+    {
+        if (!isDriving) return;
+        currentAccelInput = input.y;
+        currentSteerInput = input.x;
+    }
+
+    public void SetInput(Vector2 input) => SetDriveInput(input);
+    public void OnMoveInput(Vector2 input) => SetDriveInput(input);
 
     private void Update()
     {
@@ -100,15 +135,14 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
             AlertNearbyEnemies(transform.position, engineNoiseRadius);
         }
 
-        currentSteerInput = 0f;
-        currentAccelInput = 0f;
-
+#if UNITY_EDITOR || UNITY_STANDALONE
         if (Keyboard.current != null)
         {
             if (Keyboard.current.wKey.isPressed) currentAccelInput = 1f;
-            if (Keyboard.current.sKey.isPressed) currentAccelInput = -1f;
+            else if (Keyboard.current.sKey.isPressed) currentAccelInput = -1f;
+
             if (Keyboard.current.aKey.isPressed) currentSteerInput = -1f;
-            if (Keyboard.current.dKey.isPressed) currentSteerInput = 1f;
+            else if (Keyboard.current.dKey.isPressed) currentSteerInput = 1f;
 
             if (Keyboard.current.eKey.wasPressedThisFrame && enterCooldown <= 0f)
             {
@@ -121,6 +155,7 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
                 TriggerSonarPulse();
             }
         }
+#endif
     }
 
     private void FixedUpdate()
@@ -144,12 +179,12 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
         float forwardSpeed = Vector3.Dot(rb.linearVelocity, transform.forward);
 
-        if (currentAccelInput > 0f)
+        if (currentAccelInput > 0.05f)
         {
             if (forwardSpeed < -0.5f) ApplyBrakes(brakeTorque);
             else ApplyMotor(currentAccelInput * motorTorque);
         }
-        else if (currentAccelInput < 0f)
+        else if (currentAccelInput < -0.05f)
         {
             if (forwardSpeed > 0.5f) ApplyBrakes(brakeTorque);
             else ApplyMotor(currentAccelInput * motorTorque);
@@ -292,7 +327,6 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
     private void OnCollisionEnter(Collision collision)
     {
-        // Zero GC allocation contact point retrieval
         Vector3 hitPoint = collision.contactCount > 0 ? collision.GetContact(0).point : transform.position;
         CheckAndDestroyTree(collision.gameObject, hitPoint);
     }
@@ -321,9 +355,8 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
         GameObject rootObj = target.transform.root.gameObject;
 
-        // Perform fast layer and tag checks instead of dynamic string concatenation
         bool isTree = target.layer == treeLayerIndex || rootObj.layer == treeLayerIndex ||
-                     target.CompareTag("Tree") || rootObj.CompareTag("Tree");
+                      target.CompareTag("Tree") || rootObj.CompareTag("Tree");
 
         if (isTree)
         {
@@ -365,8 +398,7 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
         enterCooldown = 0.3f;
 
-        if (playerMovementScript != null) playerMovementScript.enabled = false;
-        if (playerController != null) playerController.enabled = false;
+        if (playerMovementScript != null) playerMovementScript.EnterVehicle(gameObject);
         if (playerCollider != null) playerCollider.enabled = false;
 
         Transform targetAnchor = driverSeat != null ? driverSeat : transform;
@@ -378,7 +410,7 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         isDriving = true;
     }
 
-    private void ExitVehicle()
+    public void ExitVehicle()
     {
         isDriving = false;
         enterCooldown = 0.3f;
@@ -398,8 +430,7 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
             playerObj.transform.rotation = exitAnchor.rotation;
 
             if (playerCollider != null) playerCollider.enabled = true;
-            if (playerController != null) playerController.enabled = true;
-            if (playerMovementScript != null) playerMovementScript.enabled = true;
+            if (playerMovementScript != null) playerMovementScript.ExitVehicle();
         }
     }
 }

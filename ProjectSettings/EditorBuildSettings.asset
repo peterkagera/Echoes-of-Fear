@@ -12,6 +12,10 @@ EditorBuildSettings:
     path: Assets/_Project/Dev_Sandbox.unity
     guid: 24a30859a1861644fbcb229dd9bd31d3
   m_configObjects:
+    com.unity.adaptivePerformance.basic.provider_settings: {fileID: 11400000, guid: e89e1c41a103b0541bd48ba4277053da, type: 2}
+    com.unity.adaptiveperformance.google.android.provider_settings: {fileID: 11400000, guid: bc0c5e8c8d293e14dbcfc9c7575e98b2, type: 2}
+    com.unity.adaptiveperformance.loader_settings: {fileID: 11400000, guid: 2c88115998fc297489e7da231fe5e489, type: 2}
+    com.unity.adaptiveperformance.simulator.provider_settings: {fileID: 11400000, guid: 104207ffc9806d445b1a7a506dc6d4c0, type: 2}
     com.unity.input.settings: {fileID: 11400000, guid: c64d7d3a133921843b2928403cab2a16, type: 2}
     com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 052faaac586de48259a63d0c4782560b, type: 3}
   m_UseUCBPForAssetBundles: 0
