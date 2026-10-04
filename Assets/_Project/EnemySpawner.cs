@@ -23,11 +23,13 @@ public class EnemySpawner : MonoBehaviour
     private float recycleTimer = 0f;
     private float despawnDistanceSqr;
 
-    // Reusable list to eliminate GC allocations during renderer toggles
     private readonly List<Renderer> reusableRendererList = new List<Renderer>();
+    private int walkableAreaMask;
 
     void Start()
     {
+        walkableAreaMask = 1 << NavMesh.GetAreaFromName("Walkable");
+
         if (playerTransform == null)
         {
             GameObject playerObj = GameObject.FindWithTag("Player");
@@ -78,12 +80,7 @@ public class EnemySpawner : MonoBehaviour
                 GameObject spawnedEnemy = Instantiate(enemyPrefab, spawnPos, Quaternion.identity, transform);
                 if (spawnedEnemy == null) continue;
 
-                spawnedEnemy.GetComponentsInChildren(true, reusableRendererList);
-                for (int i = 0; i < reusableRendererList.Count; i++)
-                {
-                    if (reusableRendererList[i] != null)
-                        reusableRendererList[i].enabled = false;
-                }
+                SetRenderersEnabled(spawnedEnemy, false);
 
                 EnemyAI aiScript = spawnedEnemy.GetComponent<EnemyAI>();
                 if (aiScript != null)
@@ -97,15 +94,11 @@ public class EnemySpawner : MonoBehaviour
                 {
                     agent.enabled = false;
                     spawnedEnemy.transform.position = spawnPos;
-                    StartCoroutine(EnableAgentSafely(agent, spawnPos, reusableRendererList.ToArray()));
+                    StartCoroutine(EnableAgentSafely(spawnedEnemy, agent, spawnPos));
                 }
                 else
                 {
-                    for (int i = 0; i < reusableRendererList.Count; i++)
-                    {
-                        if (reusableRendererList[i] != null)
-                            reusableRendererList[i].enabled = true;
-                    }
+                    SetRenderersEnabled(spawnedEnemy, true);
                 }
 
                 spawnedEnemies.Add(spawnedEnemy);
@@ -114,7 +107,17 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
-    private IEnumerator EnableAgentSafely(NavMeshAgent agent, Vector3 targetPos, Renderer[] renderers)
+    private void SetRenderersEnabled(GameObject target, bool enabledState)
+    {
+        target.GetComponentsInChildren(true, reusableRendererList);
+        for (int i = 0; i < reusableRendererList.Count; i++)
+        {
+            if (reusableRendererList[i] != null)
+                reusableRendererList[i].enabled = enabledState;
+        }
+    }
+
+    private IEnumerator EnableAgentSafely(GameObject enemyObj, NavMeshAgent agent, Vector3 targetPos)
     {
         yield return new WaitForFixedUpdate();
 
@@ -125,12 +128,9 @@ public class EnemySpawner : MonoBehaviour
             agent.Warp(targetPos);
         }
 
-        if (renderers != null)
+        if (enemyObj != null)
         {
-            for (int i = 0; i < renderers.Length; i++)
-            {
-                if (renderers[i] != null) renderers[i].enabled = true;
-            }
+            SetRenderersEnabled(enemyObj, true);
         }
     }
 
@@ -157,27 +157,18 @@ public class EnemySpawner : MonoBehaviour
                 {
                     NavMeshAgent agent = enemy.GetComponent<NavMeshAgent>();
 
-                    enemy.GetComponentsInChildren(true, reusableRendererList);
-                    for (int r = 0; r < reusableRendererList.Count; r++)
-                    {
-                        if (reusableRendererList[r] != null)
-                            reusableRendererList[r].enabled = false;
-                    }
+                    SetRenderersEnabled(enemy, false);
 
                     if (agent != null)
                     {
                         agent.enabled = false;
                         enemy.transform.position = newPos;
-                        StartCoroutine(EnableAgentSafely(agent, newPos, reusableRendererList.ToArray()));
+                        StartCoroutine(EnableAgentSafely(enemy, agent, newPos));
                     }
                     else
                     {
                         enemy.transform.position = newPos;
-                        for (int r = 0; r < reusableRendererList.Count; r++)
-                        {
-                            if (reusableRendererList[r] != null)
-                                reusableRendererList[r].enabled = true;
-                        }
+                        SetRenderersEnabled(enemy, true);
                     }
 
                     if (enableDiagnostics)
@@ -193,12 +184,12 @@ public class EnemySpawner : MonoBehaviour
     {
         if (playerTransform == null) return Vector3.zero;
 
-        for (int i = 0; i < 15; i++)
+        for (int i = 0; i < 10; i++)
         {
             Vector2 randomCircle = Random.insideUnitCircle.normalized * Random.Range(minDistanceFromPlayer, spawnRadius);
             Vector3 candidatePos = playerTransform.position + new Vector3(randomCircle.x, 0f, randomCircle.y);
 
-            if (NavMesh.SamplePosition(candidatePos, out NavMeshHit hit, 5.0f, NavMesh.AllAreas))
+            if (NavMesh.SamplePosition(candidatePos, out NavMeshHit hit, 4.0f, walkableAreaMask))
             {
                 return hit.position;
             }

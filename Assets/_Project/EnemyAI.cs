@@ -49,6 +49,10 @@ public class EnemyAI : MonoBehaviour
     private float maxChaseDistanceSqr;
     private const float NEARBY_DETECTION_SQR = 25.0f; // 5.0f * 5.0f
 
+    // Performance Optimization Caches
+    private bool lastWalkingState = false;
+    private int walkableAreaMask;
+
     void Awake()
     {
         agent = GetComponent<NavMeshAgent>();
@@ -57,6 +61,8 @@ public class EnemyAI : MonoBehaviour
         {
             anim.applyRootMotion = false;
         }
+
+        walkableAreaMask = 1 << NavMesh.GetAreaFromName("Walkable");
 
         moveSpeed += Random.Range(-0.4f, 0.4f);
         if (agent != null)
@@ -105,8 +111,11 @@ public class EnemyAI : MonoBehaviour
         if (player == null || isJumpscaring) return;
 
         bool isMoving = agent != null && agent.velocity.sqrMagnitude > 0.1f && !agent.isStopped;
-        if (anim != null)
+
+        // Optimized: Only call Animator set functions when the state changes
+        if (anim != null && isMoving != lastWalkingState)
         {
+            lastWalkingState = isMoving;
             anim.SetBool("isWalking", isMoving);
         }
 
@@ -131,7 +140,6 @@ public class EnemyAI : MonoBehaviour
             footstepTimer = Random.Range(0f, footstepInterval * 0.6f);
         }
 
-        // Fast 2D squared distance calculation without Mathf.Sqrt
         Vector3 enemyPos = transform.position;
         Vector3 playerPos = player.position;
         float dx = enemyPos.x - playerPos.x;
@@ -165,7 +173,7 @@ public class EnemyAI : MonoBehaviour
                     {
                         searchTimer = 0f;
                         Vector3 randomDir = (Random.insideUnitSphere * 25f) + transform.position;
-                        if (NavMesh.SamplePosition(randomDir, out NavMeshHit hit, 12f, NavMesh.AllAreas))
+                        if (NavMesh.SamplePosition(randomDir, out NavMeshHit hit, 12f, walkableAreaMask))
                         {
                             SetTargetPosition(hit.position);
                         }

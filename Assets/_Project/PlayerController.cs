@@ -1,6 +1,5 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
-
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -12,24 +11,32 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private MobileJoystick movementJoystick;
     [SerializeField] private MobileJoystick lookJoystick;
     [SerializeField] private GameObject mobileControlsCanvas;
+    [Tooltip("Reference to the Mobile Interact/Exit Button UI object to ensure it stays active while driving.")]
+    [SerializeField] private GameObject mobileInteractButton;
 
     [Header("Editor Testing Toggles")]
-    [Tooltip("Check this to force mobile joysticks active while testing in the Editor / Simulator window.")]
-    [SerializeField] private bool enableMobileInEditor = true;
+    [Tooltip("Check this to force mobile joysticks active in Editor regardless of active view window.")]
+    [SerializeField] private bool enableMobileInEditor = false;
 
     [Header("Movement Settings")]
     [SerializeField] private float moveSpeed = 7.5f;
     [SerializeField] private float gravity = -15.0f;
 
-    [Header("Look Settings")]
+    [Header("Touch / Joystick Look Settings")]
     [Tooltip("Rotation speed in degrees per second when using touch joysticks.")]
     [SerializeField] private float joystickLookSpeed = 75.0f;
     [Tooltip("Look acceleration response power (higher = finer control in center).")]
     [SerializeField] private float lookExponent = 1.5f;
     [Tooltip("Smoothing factor for touch camera rotation.")]
     [SerializeField] private float lookSmoothing = 25.0f;
-    [Tooltip("Sensitivity multiplier when testing with a PC Mouse in the Game view.")]
+
+    [Header("PC Mouse Look Settings")]
+    [Tooltip("Sensitivity multiplier for PC Mouse look.")]
     [SerializeField] private float mouseSensitivity = 0.15f;
+    [Tooltip("Enable smooth mouse look filtering.")]
+    [SerializeField] private bool smoothMouseLook = true;
+    [Tooltip("Smoothing speed for PC mouse look (higher = faster response).")]
+    [SerializeField] private float mouseSmoothing = 30.0f;
 
     [Header("Footstep Settings")]
     [SerializeField] private float footstepInterval = 0.4f;
@@ -37,6 +44,10 @@ public class PlayerController : MonoBehaviour
 
     [Header("References")]
     [SerializeField] private Transform cameraTransform;
+
+    [Header("Sonar Integration")]
+    [Tooltip("Optional reference to your Sonar component/script. If left blank, it will automatically search for it on player and camera.")]
+    [SerializeField] private MonoBehaviour sonarController;
 
     [Header("Flashlight Settings")]
     [Tooltip("Direct reference to the FlashlightController script on the FlashLight GameObject.")]
@@ -50,11 +61,14 @@ public class PlayerController : MonoBehaviour
     private CharacterController controller;
     private Vector2 rawMoveInput;
     private Vector2 rawLookInput;
-    private Vector2 currentLookInput;
+    private Vector2 currentJoystickLookInput;
+    private Vector2 currentMouseDelta;
     private float cameraPitch = 0.0f;
     private float verticalVelocity;
     private bool isMobileActive = false;
+    private bool isJoystickMoving = false;
     private TukTukVehicle targetTukTuk;
+    private PlayerInteractor playerInteractor;
 
     public Vector2 MoveInput => rawMoveInput;
     public Vector2 LookInput => rawLookInput;
@@ -63,6 +77,7 @@ public class PlayerController : MonoBehaviour
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
+        playerInteractor = GetComponent<PlayerInteractor>();
 
         if (flashlightController == null && cameraTransform != null)
         {
@@ -80,31 +95,19 @@ public class PlayerController : MonoBehaviour
         verticalVelocity = -2.0f;
         rawMoveInput = Vector2.zero;
         rawLookInput = Vector2.zero;
-        currentLookInput = Vector2.zero;
+        currentJoystickLookInput = Vector2.zero;
+        currentMouseDelta = Vector2.zero;
 
-#if UNITY_EDITOR
-        isMobileActive = enableMobileInEditor;
-#else
-        isMobileActive = true;
-#endif
-        SetMobileMode(isMobileActive);
+        UpdateActiveControlMode();
     }
 
     private void Update()
     {
-        if (isMobileActive)
-        {
-            if (movementJoystick != null)
-            {
-                rawMoveInput = movementJoystick.InputVector;
-            }
+#if UNITY_EDITOR
+        UpdateEditorControlMode();
+#endif
 
-            if (lookJoystick != null)
-            {
-                rawLookInput = lookJoystick.InputVector;
-            }
-        }
-
+        HandleMobileMovementInput();
         HandleLook();
 
         if (!isDriving)
@@ -114,43 +117,75 @@ public class PlayerController : MonoBehaviour
         else
         {
             HandleVehicleMovement();
+
+            // Keep Exit button visible while driving on mobile
+            if (isMobileActive && mobileInteractButton != null && !mobileInteractButton.activeSelf)
+            {
+                mobileInteractButton.SetActive(true);
+            }
         }
     }
 
-    /// <summary>
-    /// Mobile UI Event: 
-    /// Contextually handles both interacting/entering objects when walking AND exiting vehicles when driving.
-    /// </summary>
-    public void OnInteractButtonPressed()
+    private void UpdateActiveControlMode()
     {
-        if (isDriving)
+#if UNITY_EDITOR
+        CheckEditorViewMode();
+#else
+        isMobileActive = UnityEngine.Device.Application.isMobilePlatform;
+        SetMobileMode(isMobileActive);
+#endif
+    }
+
+#if UNITY_EDITOR
+    private void UpdateEditorControlMode()
+    {
+        CheckEditorViewMode();
+
+        if (!isMobileActive && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
         {
-            if (targetTukTuk != null)
-            {
-                targetTukTuk.Interact();
-            }
-            else if (currentVehicle != null && currentVehicle.TryGetComponent<TukTukVehicle>(out var tukTuk))
-            {
-                tukTuk.Interact();
-            }
-        }
-        else
-        {
-            if (TryGetComponent<PlayerInteractor>(out var interactor))
-            {
-                interactor.TriggerInteraction();
-            }
+            LockCursor();
         }
     }
+
+    private void CheckEditorViewMode()
+    {
+        if (enableMobileInEditor)
+        {
+            if (!isMobileActive) SetMobileMode(true);
+            return;
+        }
+
+        bool inSimulator = false;
+
+        var focused = EditorWindow.focusedWindow;
+        if (focused != null && focused.GetType().Name.Contains("Simulator"))
+        {
+            inSimulator = true;
+        }
+
+        var mouseOver = EditorWindow.mouseOverWindow;
+        if (mouseOver != null && mouseOver.GetType().Name.Contains("Simulator"))
+        {
+            inSimulator = true;
+        }
+
+        if (inSimulator != isMobileActive)
+        {
+            SetMobileMode(inSimulator);
+        }
+    }
+#endif
 
     private void SetMobileMode(bool mobileActive)
     {
+        isMobileActive = mobileActive;
+
         if (mobileControlsCanvas != null)
         {
-            mobileControlsCanvas.SetActive(mobileActive);
+            mobileControlsCanvas.SetActive(isMobileActive);
         }
 
-        if (mobileActive)
+        if (isMobileActive)
         {
             UnlockCursor();
         }
@@ -162,38 +197,102 @@ public class PlayerController : MonoBehaviour
 
     public void OnMove(InputAction.CallbackContext context)
     {
-        if (!isMobileActive)
+        Vector2 input = context.ReadValue<Vector2>();
+        if (!isMobileActive || input.sqrMagnitude > 0.01f || context.canceled)
         {
-            rawMoveInput = context.ReadValue<Vector2>();
+            if (!isJoystickMoving)
+            {
+                rawMoveInput = input;
+            }
         }
     }
 
     public void OnLook(InputAction.CallbackContext context)
     {
-        if (!isMobileActive)
+        Vector2 input = context.ReadValue<Vector2>();
+        if (!isMobileActive || input.sqrMagnitude > 0.01f || context.canceled)
         {
             rawLookInput = context.ReadValue<Vector2>();
         }
     }
 
-    public void OnFlashlightInput(InputAction.CallbackContext context)
+    public void OnInteract(InputAction.CallbackContext context)
     {
         if (context.started)
         {
-            ToggleFlashlight();
+            OnInteractButtonPressed();
         }
     }
 
-    public void ToggleFlashlight()
+    private void HandleMobileMovementInput()
     {
-        if (flashlightController != null)
+        if (isMobileActive && movementJoystick != null)
         {
-            flashlightController.ToggleFlashlight();
+            Vector2 joyInput = movementJoystick.InputVector;
+            if (joyInput.sqrMagnitude > 0.001f)
+            {
+                rawMoveInput = joyInput;
+                isJoystickMoving = true;
+            }
+            else if (isJoystickMoving)
+            {
+                rawMoveInput = Vector2.zero;
+                isJoystickMoving = false;
+            }
         }
-        else if (flashlightComponent != null)
+    }
+
+    private void HandleLook()
+    {
+        float mouseX = 0f;
+        float mouseY = 0f;
+
+        bool isJoystickActive = isMobileActive && lookJoystick != null && lookJoystick.InputVector.sqrMagnitude > 0.001f;
+
+        if (isJoystickActive)
         {
-            flashlightComponent.enabled = !flashlightComponent.enabled;
+            Vector2 joyInput = lookJoystick.InputVector;
+            Vector2 curvedInput = new Vector2(
+                Mathf.Sign(joyInput.x) * Mathf.Pow(Mathf.Abs(joyInput.x), lookExponent),
+                Mathf.Sign(joyInput.y) * Mathf.Pow(Mathf.Abs(joyInput.y), lookExponent)
+            );
+
+            float dampFactor = 1f - Mathf.Exp(-lookSmoothing * Time.deltaTime);
+            currentJoystickLookInput = Vector2.Lerp(currentJoystickLookInput, curvedInput, dampFactor);
+
+            mouseX = currentJoystickLookInput.x * joystickLookSpeed * Time.deltaTime;
+            mouseY = currentJoystickLookInput.y * joystickLookSpeed * Time.deltaTime;
         }
+        else
+        {
+            Vector2 targetMouseDelta = rawLookInput * mouseSensitivity;
+
+            if (smoothMouseLook)
+            {
+                float dampFactor = 1f - Mathf.Exp(-mouseSmoothing * Time.deltaTime);
+                currentMouseDelta = Vector2.Lerp(currentMouseDelta, targetMouseDelta, dampFactor);
+            }
+            else
+            {
+                currentMouseDelta = targetMouseDelta;
+            }
+
+            mouseX = currentMouseDelta.x;
+            mouseY = currentMouseDelta.y;
+
+            rawLookInput = Vector2.zero;
+        }
+
+        if (Mathf.Abs(mouseX) < 0.0001f && Mathf.Abs(mouseY) < 0.0001f) return;
+
+        cameraPitch -= mouseY;
+        cameraPitch = Mathf.Clamp(cameraPitch, -89f, 89f);
+
+        if (cameraTransform != null)
+        {
+            cameraTransform.localRotation = Quaternion.Euler(cameraPitch, 0f, 0f);
+        }
+        transform.Rotate(0f, mouseX, 0f);
     }
 
     private void HandleMovement()
@@ -241,74 +340,104 @@ public class PlayerController : MonoBehaviour
         }
         else if (currentVehicle != null)
         {
-            if (currentVehicle.TryGetComponent<TukTukVehicle>(out var tukTuk))
+            FindTukTukReference(currentVehicle);
+            if (targetTukTuk != null)
             {
-                targetTukTuk = tukTuk;
                 targetTukTuk.SetDriveInput(rawMoveInput);
             }
         }
     }
 
-    private void TriggerFootstepSound()
+    // Called via Mobile UI Button OnClick() or OnInteract Action
+    public void OnInteractButtonPressed()
     {
-        AudioManager.Instance?.PlayFootstep();
-    }
+        SuppressAndCancelSonar();
 
-    private void HandleLook()
-    {
-        float mouseX, mouseY;
-
-        if (isMobileActive)
+        if (isDriving)
         {
-            Vector2 curvedInput = new Vector2(
-                Mathf.Sign(rawLookInput.x) * Mathf.Pow(Mathf.Abs(rawLookInput.x), lookExponent),
-                Mathf.Sign(rawLookInput.y) * Mathf.Pow(Mathf.Abs(rawLookInput.y), lookExponent)
-            );
+            if (targetTukTuk == null && currentVehicle != null)
+            {
+                FindTukTukReference(currentVehicle);
+            }
 
-            float dampFactor = 1f - Mathf.Exp(-lookSmoothing * Time.deltaTime);
-            currentLookInput = Vector2.Lerp(currentLookInput, curvedInput, dampFactor);
-
-            if (currentLookInput.sqrMagnitude < 0.0001f) return;
-
-            mouseX = currentLookInput.x * joystickLookSpeed * Time.deltaTime;
-            mouseY = currentLookInput.y * joystickLookSpeed * Time.deltaTime;
+            if (targetTukTuk != null)
+            {
+                // Attempt standard vehicle exit trigger
+                targetTukTuk.Interact();
+            }
+            else
+            {
+                // Direct fallback exit if target reference lost
+                ExitVehicle();
+            }
         }
         else
         {
-            if (rawLookInput.sqrMagnitude < 0.001f) return;
-
-            mouseX = rawLookInput.x * mouseSensitivity;
-            mouseY = rawLookInput.y * mouseSensitivity;
+            if (playerInteractor == null) playerInteractor = GetComponent<PlayerInteractor>();
+            if (playerInteractor != null)
+            {
+                playerInteractor.TriggerInteraction();
+            }
         }
+    }
 
-        cameraPitch -= mouseY;
-        cameraPitch = Mathf.Clamp(cameraPitch, -89f, 89f);
+    private void FindTukTukReference(GameObject vehicle)
+    {
+        if (vehicle == null) return;
+        targetTukTuk = vehicle.GetComponent<TukTukVehicle>();
+        if (targetTukTuk == null) targetTukTuk = vehicle.GetComponentInParent<TukTukVehicle>();
+        if (targetTukTuk == null) targetTukTuk = vehicle.GetComponentInChildren<TukTukVehicle>();
+    }
 
-        if (cameraTransform != null)
+    public void OnFlashlightInput(InputAction.CallbackContext context)
+    {
+        if (context.started)
         {
-            cameraTransform.localRotation = Quaternion.Euler(cameraPitch, 0f, 0f);
+            ToggleFlashlight();
         }
-        transform.Rotate(0f, mouseX, 0f);
+    }
+
+    public void ToggleFlashlight()
+    {
+        if (flashlightController != null)
+        {
+            flashlightController.ToggleFlashlight();
+        }
+        else if (flashlightComponent != null)
+        {
+            flashlightComponent.enabled = !flashlightComponent.enabled;
+        }
     }
 
     public void EnterVehicle(GameObject vehicle)
     {
+        SuppressAndCancelSonar();
+
         currentVehicle = vehicle;
         isDriving = true;
 
-        if (currentVehicle != null)
-        {
-            targetTukTuk = currentVehicle.GetComponent<TukTukVehicle>();
-        }
+        FindTukTukReference(currentVehicle);
 
         if (controller != null)
         {
             controller.enabled = false;
         }
+
+        if (playerInteractor != null)
+        {
+            playerInteractor.enabled = false;
+        }
+
+        if (isMobileActive && mobileInteractButton != null)
+        {
+            mobileInteractButton.SetActive(true);
+        }
     }
 
     public void ExitVehicle()
     {
+        SuppressAndCancelSonar();
+
         if (targetTukTuk != null)
         {
             targetTukTuk.SetDriveInput(Vector2.zero);
@@ -322,6 +451,34 @@ public class PlayerController : MonoBehaviour
         {
             controller.enabled = true;
         }
+
+        if (playerInteractor != null)
+        {
+            playerInteractor.enabled = true;
+        }
+    }
+
+    private void SuppressAndCancelSonar()
+    {
+        gameObject.SendMessage("CancelActiveSonar", SendMessageOptions.DontRequireReceiver);
+        gameObject.SendMessage("SuppressSonar", SendMessageOptions.DontRequireReceiver);
+
+        if (cameraTransform != null)
+        {
+            cameraTransform.gameObject.SendMessage("CancelActiveSonar", SendMessageOptions.DontRequireReceiver);
+            cameraTransform.gameObject.SendMessage("SuppressSonar", SendMessageOptions.DontRequireReceiver);
+        }
+
+        if (sonarController != null)
+        {
+            sonarController.SendMessage("CancelActiveSonar", SendMessageOptions.DontRequireReceiver);
+            sonarController.SendMessage("SuppressSonar", SendMessageOptions.DontRequireReceiver);
+        }
+    }
+
+    private void TriggerFootstepSound()
+    {
+        AudioManager.Instance?.PlayFootstep();
     }
 
     public void UnlockCursor()

@@ -6,20 +6,40 @@ public class ExtractionGate : MonoBehaviour
     public GameObject winCanvasUI;
 
     [Header("Victory Requirements")]
-    public int requiredBatteries = 15;
+    public int requiredBatteries = 5;
+
+    private bool isVictorious = false;
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Player"))
+        CheckVictoryCondition(other);
+    }
+
+    private void OnTriggerStay(Collider other)
+    {
+        CheckVictoryCondition(other);
+    }
+
+    private void CheckVictoryCondition(Collider other)
+    {
+        if (isVictorious) return;
+
+        // Detect player directly, via parent/child hierarchy, or via vehicle
+        bool isPlayerOrVehicle = other.CompareTag("Player") ||
+                                 other.GetComponent<PlayerController>() != null ||
+                                 other.GetComponentInParent<PlayerController>() != null ||
+                                 other.GetComponentInChildren<PlayerController>() != null ||
+                                 other.GetComponent<TukTukVehicle>() != null ||
+                                 other.GetComponentInParent<TukTukVehicle>() != null ||
+                                 other.GetComponentInChildren<TukTukVehicle>() != null;
+
+        if (isPlayerOrVehicle)
         {
-            if (BatterySpawner.Instance != null)
-            {
-                if (BatterySpawner.Instance.CollectedBatteries >= requiredBatteries)
-                {
-                    TriggerVictory();
-                }
-            }
-            else
+            int currentBatteries = (BatterySpawner.Instance != null)
+                ? BatterySpawner.Instance.CollectedBatteries
+                : requiredBatteries;
+
+            if (currentBatteries >= requiredBatteries)
             {
                 TriggerVictory();
             }
@@ -28,6 +48,11 @@ public class ExtractionGate : MonoBehaviour
 
     public void TriggerVictory()
     {
+        if (isVictorious) return;
+        isVictorious = true;
+
+        Debug.Log("[ExtractionGate] Victory condition met! Triggering Win Screen.");
+
         if (winCanvasUI != null)
         {
             winCanvasUI.SetActive(true);

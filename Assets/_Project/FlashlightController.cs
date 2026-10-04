@@ -1,37 +1,60 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.UI;
+using TMPro;
 
 public class FlashlightController : MonoBehaviour
 {
+    public static FlashlightController Instance { get; private set; }
+
     [Header("Settings")]
     [SerializeField] private Light flashlightSpot;
     [SerializeField] private bool isOn = false;
     [SerializeField] private float maxBattery = 100f;
     [SerializeField] private float drainRate = 2f; // % per second
+
+    [Header("UI References")]
     [SerializeField] private Slider batterySlider;
+    [SerializeField] private TextMeshProUGUI batteryPercentText;
 
     public float CurrentBattery { get; private set; }
     public bool IsOn => isOn;
 
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
+
     private void Start()
     {
-        CurrentBattery = maxBattery;
-        if (flashlightSpot != null)
+        ResetFlashlight();
+    }
+
+    private void OnDestroy()
+    {
+        if (Instance == this)
         {
-            flashlightSpot.enabled = isOn;
-        }
-        if (batterySlider != null)
-        {
-            batterySlider.minValue = 0f;
-            batterySlider.maxValue = maxBattery;
-            UpdateUI(true);
+            Instance = null;
         }
     }
 
     private void Update()
     {
-        if (isOn && flashlightSpot != null)
+        // 1. Direct PC Keyboard 'F' key tap listener
+        if (Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame)
+        {
+            ToggleFlashlight();
+        }
+
+        // 2. Battery Drain logic while light is ON
+        if (!isOn) return;
+
+        if (CurrentBattery > 0f)
         {
             CurrentBattery -= drainRate * Time.deltaTime;
             CurrentBattery = Mathf.Clamp(CurrentBattery, 0f, maxBattery);
@@ -40,30 +63,40 @@ public class FlashlightController : MonoBehaviour
 
             if (CurrentBattery <= 0f)
             {
-                isOn = false;
-                flashlightSpot.enabled = false;
+                TurnOff();
             }
         }
     }
 
-    public void OnFlashlight(InputValue value)
+    // Called on single-tap of Mobile UI Button or PC 'F' Key
+    public void ToggleFlashlight()
     {
-        if (value.isPressed && CurrentBattery > 0f)
+        if (isOn)
         {
-            ToggleFlashlight();
+            TurnOff();
+        }
+        else if (CurrentBattery > 0f)
+        {
+            TurnOn();
         }
     }
 
-    public void ToggleFlashlight()
+    public void TurnOn()
     {
-        AudioManager.Instance?.PlayFlashlightToggle();
         if (CurrentBattery <= 0f) return;
 
-        isOn = !isOn;
-        if (flashlightSpot != null)
-        {
-            flashlightSpot.enabled = isOn;
-        }
+        isOn = true;
+        if (flashlightSpot != null) flashlightSpot.enabled = true;
+        AudioManager.Instance?.PlayFlashlightToggle();
+        UpdateUI(true);
+    }
+
+    public void TurnOff()
+    {
+        isOn = false;
+        if (flashlightSpot != null) flashlightSpot.enabled = false;
+        AudioManager.Instance?.PlayFlashlightToggle();
+        UpdateUI(true);
     }
 
     public void RechargeBattery(float amount)
@@ -72,15 +105,36 @@ public class FlashlightController : MonoBehaviour
         UpdateUI(true);
     }
 
+    public void ResetFlashlight()
+    {
+        CurrentBattery = maxBattery;
+        isOn = false;
+
+        if (flashlightSpot != null)
+        {
+            flashlightSpot.enabled = false;
+        }
+
+        if (batterySlider != null)
+        {
+            batterySlider.minValue = 0f;
+            batterySlider.maxValue = maxBattery;
+        }
+
+        UpdateUI(true);
+    }
+
     private void UpdateUI(bool force = false)
     {
         if (batterySlider != null)
         {
-            // Only force canvas rebuilds when battery level changes by >0.5% or on forced events
-            if (force || Mathf.Abs(batterySlider.value - CurrentBattery) > 0.5f)
-            {
-                batterySlider.value = CurrentBattery;
-            }
+            batterySlider.value = CurrentBattery;
+        }
+
+        if (batteryPercentText != null)
+        {
+            int percent = Mathf.CeilToInt((CurrentBattery / maxBattery) * 100f);
+            batteryPercentText.text = $"{percent}%";
         }
     }
 }

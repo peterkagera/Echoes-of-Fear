@@ -12,28 +12,17 @@ public class BatteryPickup : MonoBehaviour, IInteractable
     public void Interact()
     {
         AudioManager.Instance?.PlayBatteryPickup();
-        FlashlightController flashlight = FindAnyObjectByType<FlashlightController>();
-        bool usedForFlashlight = false;
 
-        if (flashlight != null)
+        // Recharge flashlight (if FlashlightController exists in scene)
+        if (FlashlightController.Instance != null)
         {
-            if (flashlight.IsOn)
-            {
-                usedForFlashlight = true;
-            }
-            flashlight.RechargeBattery(rechargeAmount);
+            FlashlightController.Instance.RechargeBattery(rechargeAmount);
         }
 
+        // Notify Spawner to decrement counter and update UI HUD
         if (BatterySpawner.Instance != null)
         {
-            if (!usedForFlashlight)
-            {
-                BatterySpawner.Instance.BatteryCollected(gameObject);
-            }
-            else
-            {
-                BatterySpawner.Instance.UnregisterBattery(gameObject);
-            }
+            BatterySpawner.Instance.BatteryCollected(gameObject);
         }
 
         Destroy(gameObject);
