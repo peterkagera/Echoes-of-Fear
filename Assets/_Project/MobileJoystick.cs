@@ -12,7 +12,9 @@ public class MobileJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler, 
 
     public Vector2 InputVector { get; private set; }
 
-    private Vector2 handleStartPosition;
+    // Stores the exact point where the user touched down
+    private Vector2 pointerDownPosition;
+    private Canvas parentCanvas;
 
     private void Awake()
     {
@@ -26,15 +28,38 @@ public class MobileJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler, 
             handleRect = transform.GetChild(0).GetComponent<RectTransform>();
         }
 
-        if (handleRect != null)
-        {
-            handleStartPosition = handleRect.anchoredPosition;
-        }
+        // Cache the parent Canvas reference
+        parentCanvas = GetComponentInParent<Canvas>();
+    }
+
+    // Safely determines the correct camera parameter based on Canvas Render Mode
+    private Camera GetUICamera()
+    {
+        if (parentCanvas == null) return null;
+
+        // MUST return null if Canvas is Screen Space - Overlay
+        return (parentCanvas.renderMode == RenderMode.ScreenSpaceOverlay)
+            ? null
+            : parentCanvas.worldCamera;
     }
 
     public void OnPointerDown(PointerEventData eventData)
     {
-        OnDrag(eventData);
+        // 1. Convert touch position to local space inside container using GetUICamera()
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
+            containerRect,
+            eventData.position,
+            GetUICamera(),
+            out pointerDownPosition))
+        {
+            // 2. Snap handle center directly to touch position
+            if (handleRect != null)
+            {
+                handleRect.anchoredPosition = pointerDownPosition;
+            }
+
+            OnDrag(eventData);
+        }
     }
 
     public void OnDrag(PointerEventData eventData)
@@ -42,15 +67,16 @@ public class MobileJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler, 
         if (RectTransformUtility.ScreenPointToLocalPointInRectangle(
             containerRect,
             eventData.position,
-            eventData.pressEventCamera,
+            GetUICamera(),
             out Vector2 localPoint))
         {
-            Vector2 offset = localPoint - handleStartPosition;
+            // 3. Measure offset relative to touch start point
+            Vector2 offset = localPoint - pointerDownPosition;
             InputVector = Vector2.ClampMagnitude(offset / handleRange, 1.0f);
 
             if (handleRect != null)
             {
-                handleRect.anchoredPosition = handleStartPosition + (InputVector * handleRange);
+                handleRect.anchoredPosition = pointerDownPosition + (InputVector * handleRange);
             }
         }
     }
@@ -60,7 +86,8 @@ public class MobileJoystick : MonoBehaviour, IPointerDownHandler, IDragHandler, 
         InputVector = Vector2.zero;
         if (handleRect != null)
         {
-            handleRect.anchoredPosition = handleStartPosition;
+            // Reset handle position back to center when released
+            handleRect.anchoredPosition = Vector2.zero;
         }
     }
 }

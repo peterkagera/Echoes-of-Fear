@@ -15,6 +15,13 @@ public class PlayerInteractor : MonoBehaviour
     private const float RaycastInterval = 0.1f; // 10 checks/sec instead of 60+
     private string lastPromptText = "";
 
+    private void OnDisable()
+    {
+        // Clear text and target whenever interactor is disabled (e.g., entering vehicle)
+        currentInteractable = null;
+        UpdatePromptText("");
+    }
+
     private void Update()
     {
         raycastTimer += Time.deltaTime;
@@ -41,7 +48,8 @@ public class PlayerInteractor : MonoBehaviour
             if (interactable != null)
             {
                 currentInteractable = interactable;
-                UpdatePromptText($"Press E: {currentInteractable.GetPrompt()}");
+                // Use prompt string directly without prepending "Press E:"
+                UpdatePromptText(currentInteractable.GetPrompt());
                 return;
             }
         }
@@ -52,10 +60,19 @@ public class PlayerInteractor : MonoBehaviour
 
     private void UpdatePromptText(string newText)
     {
-        if (promptText != null && lastPromptText != newText)
+        if (promptText == null) return;
+
+        if (lastPromptText != newText)
         {
             promptText.text = newText;
             lastPromptText = newText;
+        }
+
+        // Hide text UI when empty, show when text exists
+        bool shouldBeActive = !string.IsNullOrEmpty(newText);
+        if (promptText.gameObject.activeSelf != shouldBeActive)
+        {
+            promptText.gameObject.SetActive(shouldBeActive);
         }
     }
 

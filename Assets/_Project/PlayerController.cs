@@ -69,7 +69,7 @@ public class PlayerController : MonoBehaviour
     private bool isJoystickMoving = false;
     private TukTukVehicle targetTukTuk;
     private PlayerInteractor playerInteractor;
-
+    public bool IsMobileActive => isMobileActive;
     public Vector2 MoveInput => rawMoveInput;
     public Vector2 LookInput => rawLookInput;
     public bool IsDriving => isDriving;
@@ -428,6 +428,13 @@ public class PlayerController : MonoBehaviour
             playerInteractor.enabled = false;
         }
 
+        // Clear and hide HUD interaction text when entering vehicle
+        GameObject interactionTextObj = GameObject.Find("InteractionText");
+        if (interactionTextObj != null)
+        {
+            interactionTextObj.SetActive(false);
+        }
+
         if (isMobileActive && mobileInteractButton != null)
         {
             mobileInteractButton.SetActive(true);
@@ -491,5 +498,23 @@ public class PlayerController : MonoBehaviour
     {
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
+    }
+
+    // Called via Mobile UI SonarButton OnClick()
+    public void OnSonarButtonPressed()
+    {
+        if (sonarController != null)
+        {
+            sonarController.SendMessage("TriggerPing", SendMessageOptions.DontRequireReceiver);
+        }
+        else
+        {
+            // Fallback search if sonarController reference wasn't assigned in Inspector
+            var sonar = FindAnyObjectByType<SonarPingController>();
+            if (sonar != null)
+            {
+                sonar.TriggerPing();
+            }
+        }
     }
 }

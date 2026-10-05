@@ -82,20 +82,26 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
     public string GetPrompt()
     {
-        if (isDriving)
+        // Runtime check: true on physical mobile devices
+        bool isMobile = Application.isMobilePlatform;
+
+        // Check Editor Device Simulator state if testing on PC Editor
+        if (playerMovementScript == null)
         {
-#if UNITY_ANDROID || UNITY_IOS
-            return "Tap to Exit";
-#else
-        return "Press E: Exit Tuk-Tuk";
-#endif
+            CachePlayerReferences();
         }
 
-#if UNITY_ANDROID || UNITY_IOS
-        return "Tap to Drive Tuk-Tuk";
-#else
-    return "Press E: Drive Tuk-Tuk";
-#endif
+        if (playerMovementScript != null && playerMovementScript.IsMobileActive)
+        {
+            isMobile = true;
+        }
+
+        if (isDriving)
+        {
+            return isMobile ? "Tap to Exit" : "Press E: Exit Tuk-Tuk";
+        }
+
+        return isMobile ? "Tap to Drive Tuk-Tuk" : "Press E: Drive Tuk-Tuk";
     }
 
     public void Interact()
