@@ -8,13 +8,15 @@ public class JumpscareManager : MonoBehaviour
 
     [Header("Camera & Target Settings")]
     [SerializeField] private Camera mainCamera;
-    [SerializeField] private float headHeightOffset = 1.6f;
-    [SerializeField] private float snapToFaceSpeed = 25f;
+    [SerializeField] private float eyeLevelOffset = 1.6f;
+    [SerializeField] private float enemyFaceDistance = 1.3f; // Ideal distance in front of camera
+    [SerializeField] private float snapToFaceSpeed = 30f;
     [SerializeField] private float jumpscareDuration = 2.0f;
 
-    [Header("Camera Shake Settings")]
-    [SerializeField] private float shakeIntensity = 0.06f;
-    [SerializeField] private float shakeFrequency = 30f;
+    [Header("Camera Shake & Zoom Settings")]
+    [SerializeField] private float shakeIntensity = 0.08f;
+    [SerializeField] private float shakeFrequency = 35f;
+    [SerializeField] private float zoomFOV = 45f; // FOV punch for intense horror feel
 
     [Header("Audio & UI")]
     [SerializeField] private AudioSource audioSource;
@@ -53,6 +55,13 @@ public class JumpscareManager : MonoBehaviour
             vehicle.OnPlayerKilled();
         }
 
+        // Dim or disable player flashlight so the enemy texture isn't blown out white
+        FlashlightController flashlight = FindFirstObjectByType<FlashlightController>();
+        if (flashlight != null)
+        {
+            flashlight.enabled = false;
+        }
+
         if (playerController == null)
         {
             playerController = FindFirstObjectByType<PlayerController>();
@@ -61,6 +70,9 @@ public class JumpscareManager : MonoBehaviour
         {
             playerController.enabled = false;
         }
+
+        CharacterController playerCC = FindFirstObjectByType<CharacterController>();
+        if (playerCC != null) playerCC.enabled = false;
 
         if (mainCamera != null)
         {
@@ -71,15 +83,24 @@ public class JumpscareManager : MonoBehaviour
             }
         }
 
-        CharacterController playerCC = FindFirstObjectByType<CharacterController>();
-        if (playerCC != null) playerCC.enabled = false;
-
         if (attackingEnemy != null)
         {
+            // FIX: Zero velocity BEFORE making the Rigidbody kinematic to prevent Unity 6 warning
+            Rigidbody enemyRB = attackingEnemy.GetComponent<Rigidbody>();
+            if (enemyRB != null)
+            {
+                if (!enemyRB.isKinematic)
+                {
+                    enemyRB.linearVelocity = Vector3.zero;
+                    enemyRB.angularVelocity = Vector3.zero;
+                }
+                enemyRB.isKinematic = true;
+            }
+
             NavMeshAgent attackingAgent = attackingEnemy.GetComponent<NavMeshAgent>();
             if (attackingAgent != null)
             {
-                if (attackingAgent.isOnNavMesh)
+                if (attackingAgent.enabled && attackingAgent.isOnNavMesh)
                 {
                     attackingAgent.isStopped = true;
                     attackingAgent.velocity = Vector3.zero;
@@ -87,19 +108,27 @@ public class JumpscareManager : MonoBehaviour
                 attackingAgent.enabled = false;
             }
 
-            Rigidbody enemyRB = attackingEnemy.GetComponent<Rigidbody>();
-            if (enemyRB != null)
+            // Position monster directly in front of camera at face height facing the player
+            if (mainCamera != null)
             {
-                enemyRB.isKinematic = true;
-                enemyRB.linearVelocity = Vector3.zero;
+                Vector3 camPos = mainCamera.transform.position;
+                Vector3 camForward = mainCamera.transform.forward;
+                camForward.y = 0f;
+                camForward.Normalize();
+
+                Vector3 targetMonsterPos = camPos + camForward * enemyFaceDistance;
+                targetMonsterPos.y = camPos.y - eyeLevelOffset;
+                attackingEnemy.position = targetMonsterPos;
+                attackingEnemy.rotation = Quaternion.LookRotation(-camForward);
             }
 
+            // Enable animation playback instead of freezing on frame 0
             Animator enemyAnim = attackingEnemy.GetComponentInChildren<Animator>();
             if (enemyAnim != null)
             {
-                enemyAnim.SetBool("isWalking", false);
+                enemyAnim.enabled = true;
+                enemyAnim.speed = 1.0f;
                 enemyAnim.Play("Idle", 0, 0f);
-                enemyAnim.speed = 0f;
             }
 
             CleanUpOtherEnemies(attackingEnemy);
@@ -130,20 +159,18 @@ public class JumpscareManager : MonoBehaviour
         if (mainCamera == null || enemyTransform == null) yield break;
 
         Vector3 initialCamLocalPos = mainCamera.transform.localPosition;
+        float originalFOV = mainCamera.fieldOfView;
         float elapsedTime = 0f;
 
-        Vector3 faceTargetPos = enemyTransform.position + (Vector3.up * headHeightOffset);
+        Vector3 faceTargetPos = enemyTransform.position + (Vector3.up * eyeLevelOffset);
         if (headTarget != null)
         {
-            float relativeBoneHeight = headTarget.position.y - enemyTransform.position.y;
-            if (relativeBoneHeight >= 1.0f && relativeBoneHeight <= 2.2f)
-            {
-                faceTargetPos = headTarget.position;
-            }
+            faceTargetPos = headTarget.position;
         }
 
         while (elapsedTime < jumpscareDuration)
         {
+            // Snap camera directly to monster face
             Vector3 directionToFace = (faceTargetPos - mainCamera.transform.position).normalized;
             if (directionToFace != Vector3.zero)
             {
@@ -153,6 +180,10 @@ public class JumpscareManager : MonoBehaviour
                 );
             }
 
+            // Quick FOV zoom for cinematic impact
+            mainCamera.fieldOfView = Mathf.Lerp(mainCamera.fieldOfView, zoomFOV, Time.deltaTime * 12f);
+
+            // Screen shake
             float shakeX = (Mathf.PerlinNoise(Time.time * shakeFrequency, 0f) - 0.5f) * 2f * shakeIntensity;
             float shakeY = (Mathf.PerlinNoise(0f, Time.time * shakeFrequency) - 0.5f) * 2f * shakeIntensity;
             mainCamera.transform.localPosition = initialCamLocalPos + new Vector3(shakeX, shakeY, 0f);
@@ -162,6 +193,8 @@ public class JumpscareManager : MonoBehaviour
         }
 
         mainCamera.transform.localPosition = initialCamLocalPos;
+        mainCamera.fieldOfView = originalFOV;
+
         if (gameOverUI != null)
         {
             gameOverUI.SetActive(true);

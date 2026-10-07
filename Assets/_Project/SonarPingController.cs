@@ -22,8 +22,13 @@ public class SonarPingController : MonoBehaviour
     public float lightHeightOffset = 4.0f;
     public float lightRangeMultiplier = 1.4f;
 
-    [Header("Battery Radar")]
+    [Header("Battery & Enemy Layers")]
     public LayerMask batteryLayer;
+    public LayerMask enemyLayer;
+
+    [Header("Defensive Shockwave Settings")]
+    public float knockbackForce = 22f;
+    public float stunDuration = 3.5f;
 
     private MaterialPropertyBlock propBlock;
     private float currentRadius = 0f;
@@ -32,7 +37,9 @@ public class SonarPingController : MonoBehaviour
     private float fadeTimer = 0f;
     private Vector3 activePingOrigin;
 
-    private readonly Collider[] hitBuffer = new Collider[16];
+    private readonly Collider[] hitBuffer = new Collider[32];
+    private readonly HashSet<EnemyAI> hitEnemiesThisPing = new HashSet<EnemyAI>();
+
     private static readonly int PulseRadiusID = Shader.PropertyToID("_PulseRadius");
     private static readonly int PulseCenterID = Shader.PropertyToID("_PulseCenter");
 
@@ -86,6 +93,9 @@ public class SonarPingController : MonoBehaviour
                 sonarLight.intensity = Mathf.Lerp(maxLightIntensity * 0.6f, maxLightIntensity, currentRadius / maxRadius);
             }
 
+            // I evaluate shockwave hits dynamically as my visual ring expands outward
+            ApplyWavefrontShockwave(activePingOrigin, currentRadius);
+
             if (currentRadius >= maxRadius)
             {
                 isPinging = false;
@@ -119,6 +129,9 @@ public class SonarPingController : MonoBehaviour
         isFadingOut = false;
         activePingOrigin = (playerTransform != null) ? playerTransform.position : transform.position;
 
+        // I clear the tracking set at the start of each new pulse
+        hitEnemiesThisPing.Clear();
+
         if (sonarRenderer != null)
         {
             sonarRenderer.enabled = true;
@@ -134,7 +147,7 @@ public class SonarPingController : MonoBehaviour
             sonarLight.enabled = true;
             sonarLight.range = lightHeightOffset * lightRangeMultiplier;
             sonarLight.intensity = maxLightIntensity * 0.6f;
-            sonarLight.shadows = LightShadows.None; // Disabled dynamic shadows on ping light to save mobile GPU cycles
+            sonarLight.shadows = LightShadows.None;
         }
 
         if (RetinalAfterBurn.Instance != null)
@@ -142,24 +155,40 @@ public class SonarPingController : MonoBehaviour
             RetinalAfterBurn.Instance.CaptureAfterBurn();
         }
 
-        EnemyAI[] enemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
-        for (int i = 0; i < enemies.Length; i++)
-        {
-            if (enemies[i] != null) enemies[i].AlertToSound(activePingOrigin, maxRadius);
-        }
-
         ScanForBatteries(activePingOrigin);
+    }
+
+    private void ApplyWavefrontShockwave(Vector3 origin, float radius)
+    {
+        int hitCount = Physics.OverlapSphereNonAlloc(origin, radius, hitBuffer, enemyLayer);
+        for (int i = 0; i < hitCount; i++)
+        {
+            if (hitBuffer[i] == null) continue;
+
+            EnemyAI enemy = hitBuffer[i].GetComponentInParent<EnemyAI>();
+            if (enemy != null && !hitEnemiesThisPing.Contains(enemy))
+            {
+                // I register this enemy so they are only impacted once per wave
+                hitEnemiesThisPing.Add(enemy);
+
+                // I compute the directional force pushing them away from the center
+                Vector3 knockbackDir = (enemy.transform.position - origin).normalized;
+                knockbackDir.y = 0.25f; // I apply an upward arc to lift them off the ground
+
+                enemy.ApplyKnockback(knockbackDir * knockbackForce);
+                enemy.Stun(stunDuration);
+            }
+        }
     }
 
     private void ScanForBatteries(Vector3 origin)
     {
-        // Non-allocating sphere check
         int hitCount = Physics.OverlapSphereNonAlloc(origin, maxRadius, hitBuffer, batteryLayer);
         for (int i = 0; i < hitCount; i++)
         {
             if (hitBuffer[i] != null && hitBuffer[i].GetComponent<BatteryPickup>() != null)
             {
-                // Process battery detection if needed
+                // Process battery detection
             }
         }
     }

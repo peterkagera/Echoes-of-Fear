@@ -154,7 +154,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 80, y: 80}
+  m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &14714349
 MonoBehaviour:
@@ -450,8 +450,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -56, y: 77}
-  m_SizeDelta: {x: 110, y: 110}
+  m_AnchoredPosition: {x: -200, y: 80}
+  m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 1, y: 0}
 --- !u!114 &37103250
 MonoBehaviour:
@@ -895,11 +895,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::JumpscareManager
   mainCamera: {fileID: 1404390610}
-  headHeightOffset: 1.5
-  snapToFaceSpeed: 20
-  jumpscareDuration: 2.5
-  shakeIntensity: 0.12
+  eyeLevelOffset: 1.6
+  enemyFaceDistance: 1.3
+  snapToFaceSpeed: 30
+  jumpscareDuration: 2
+  shakeIntensity: 0.08
   shakeFrequency: 35
+  zoomFOV: 45
   audioSource: {fileID: 60211912}
   jumpscareSound: {fileID: 8300000, guid: c06054a9944074948b5440a1de724a14, type: 3}
   gameOverUI: {fileID: 1368303834}
@@ -8613,6 +8615,11 @@ MonoBehaviour:
   batteryLayer:
     serializedVersion: 2
     m_Bits: 256
+  enemyLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  knockbackForce: 22
+  stunDuration: 3.5
 --- !u!114 &613352688
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -10181,8 +10188,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -57.120117, y: 231}
-  m_SizeDelta: {x: 110, y: 110}
+  m_AnchoredPosition: {x: -80, y: 220}
+  m_SizeDelta: {x: 120, y: 120}
   m_Pivot: {x: 1, y: 0}
 --- !u!114 &688555308
 MonoBehaviour:
@@ -17204,8 +17211,8 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0}
   m_AnchorMax: {x: 1, y: 0}
-  m_AnchoredPosition: {x: -59, y: 390}
-  m_SizeDelta: {x: 110, y: 110}
+  m_AnchoredPosition: {x: -80, y: 80}
+  m_SizeDelta: {x: 100, y: 100}
   m_Pivot: {x: 1, y: 0}
 --- !u!114 &1126673082
 MonoBehaviour:
@@ -21472,7 +21479,7 @@ RectTransform:
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 80, y: 80}
+  m_SizeDelta: {x: 60, y: 60}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1492159477
 MonoBehaviour:

@@ -5,7 +5,7 @@ using UnityEngine.AI;
 [RequireComponent(typeof(NavMeshAgent))]
 public class EnemyAI : MonoBehaviour
 {
-    public enum AIState { Dormant, ChasingPlayer, SearchingSound, Patrolling }
+    public enum AIState { Dormant, ChasingPlayer, SearchingSound, Patrolling, Stunned }
 
     [Header("References")]
     public Transform player;
@@ -32,12 +32,16 @@ public class EnemyAI : MonoBehaviour
 
     private NavMeshAgent agent;
     private Animator anim;
+    private Rigidbody rb;
     private AIState currentState = AIState.Dormant;
     private float pathUpdateTimer = 0f;
     private const float PATH_UPDATE_INTERVAL = 0.25f;
     private Vector3 lastKnownPlayerPos;
     private float searchTimer = 0f;
     private bool isJumpscaring = false;
+    private bool isStunned = false;
+    private Coroutine stunRoutine;
+
     private float logTimer = 0f;
     private float footstepTimer = 0f;
     private float currentStepInterval;
@@ -57,6 +61,8 @@ public class EnemyAI : MonoBehaviour
     {
         agent = GetComponent<NavMeshAgent>();
         anim = GetComponentInChildren<Animator>();
+        rb = GetComponent<Rigidbody>();
+
         if (anim != null)
         {
             anim.applyRootMotion = false;
@@ -108,9 +114,10 @@ public class EnemyAI : MonoBehaviour
 
     void Update()
     {
-        if (player == null || isJumpscaring) return;
+        // I prevent any movement, state changes, or jumpscares if I am currently stunned or dead
+        if (player == null || isJumpscaring || isStunned) return;
 
-        bool isMoving = agent != null && agent.velocity.sqrMagnitude > 0.1f && !agent.isStopped;
+        bool isMoving = agent != null && agent.enabled && agent.velocity.sqrMagnitude > 0.1f && !agent.isStopped;
 
         // Optimized: Only call Animator set functions when the state changes
         if (anim != null && isMoving != lastWalkingState)
@@ -152,7 +159,7 @@ public class EnemyAI : MonoBehaviour
             if (logTimer >= 2.0f)
             {
                 logTimer = 0f;
-                Debug.Log($"[{gameObject.name}] State={currentState} | Dist={Mathf.Sqrt(sqrDistToPlayer):F1}m | Speed={agent.velocity.magnitude:F1}m/s | HasPath={agent.hasPath}", this);
+                Debug.Log($"[{gameObject.name}] State={currentState} | Dist={Mathf.Sqrt(sqrDistToPlayer):F1}m | Speed={(agent != null && agent.enabled ? agent.velocity.magnitude : 0f):F1}m/s | HasPath={(agent != null && agent.enabled && agent.hasPath)}", this);
             }
         }
 
@@ -166,7 +173,7 @@ public class EnemyAI : MonoBehaviour
         {
             case AIState.Dormant:
             case AIState.Patrolling:
-                if (agent != null && agent.isOnNavMesh && (!agent.hasPath || agent.remainingDistance <= agent.stoppingDistance))
+                if (agent != null && agent.enabled && agent.isOnNavMesh && (!agent.hasPath || agent.remainingDistance <= agent.stoppingDistance))
                 {
                     searchTimer += Time.deltaTime;
                     if (searchTimer >= 3.5f)
@@ -209,7 +216,7 @@ public class EnemyAI : MonoBehaviour
                     return;
                 }
 
-                if (agent != null && agent.isOnNavMesh && !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
+                if (agent != null && agent.enabled && agent.isOnNavMesh && !agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
                 {
                     searchTimer += Time.deltaTime;
                     if (searchTimer >= searchDuration)
@@ -240,13 +247,92 @@ public class EnemyAI : MonoBehaviour
 
     public void AlertToSound(Vector3 soundPosition, float volume)
     {
-        if (isJumpscaring || currentState == AIState.ChasingPlayer) return;
+        if (isJumpscaring || isStunned || currentState == AIState.ChasingPlayer) return;
 
         float distToSound = Vector3.Distance(transform.position, soundPosition);
         if (distToSound <= detectionRange * volume)
         {
             SetState(AIState.SearchingSound);
             SetTargetPosition(soundPosition);
+        }
+    }
+
+    // I handle physical knockback forces applied by sonar waves
+    public void ApplyKnockback(Vector3 force)
+    {
+        if (isJumpscaring) return;
+
+        if (agent != null && agent.enabled)
+        {
+            agent.enabled = false;
+        }
+
+        if (rb != null)
+        {
+            rb.isKinematic = false;
+            rb.AddForce(force, ForceMode.Impulse);
+        }
+        else
+        {
+            transform.position += force * 0.05f;
+        }
+    }
+
+    // I initiate the stun state and manage recovery timers
+    public void Stun(float duration)
+    {
+        if (isJumpscaring) return;
+
+        if (stunRoutine != null)
+        {
+            StopCoroutine(stunRoutine);
+        }
+        stunRoutine = StartCoroutine(StunRoutineProcess(duration));
+    }
+
+    private IEnumerator StunRoutineProcess(float duration)
+    {
+        isStunned = true;
+        currentState = AIState.Stunned;
+
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = true;
+            agent.enabled = false;
+        }
+
+        if (anim != null)
+        {
+            anim.SetBool("isWalking", false);
+            lastWalkingState = false;
+        }
+
+        yield return new WaitForSeconds(duration);
+
+        if (rb != null)
+        {
+            rb.isKinematic = true;
+        }
+
+        isStunned = false;
+
+        if (agent != null)
+        {
+            agent.enabled = true;
+            if (agent.isOnNavMesh)
+            {
+                agent.isStopped = false;
+            }
+        }
+
+        // I default back to searching or chasing once recovery completes
+        if (player != null && Vector3.SqrMagnitude(transform.position - player.position) <= detectionRangeSqr)
+        {
+            SetState(AIState.ChasingPlayer);
+        }
+        else
+        {
+            SetState(AIState.SearchingSound);
         }
     }
 
@@ -261,7 +347,7 @@ public class EnemyAI : MonoBehaviour
 
     public void SetState(AIState newState)
     {
-        if (isJumpscaring || currentState == newState) return;
+        if (isJumpscaring || isStunned || currentState == newState) return;
 
         if (enableDiagnostics)
         {
@@ -269,7 +355,7 @@ public class EnemyAI : MonoBehaviour
         }
 
         currentState = newState;
-        if (agent != null && agent.isOnNavMesh)
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
         {
             agent.isStopped = false;
             agent.speed = moveSpeed;
@@ -301,7 +387,7 @@ public class EnemyAI : MonoBehaviour
 
     private void TriggerJumpscare()
     {
-        if (isJumpscaring) return;
+        if (isJumpscaring || isStunned) return;
         isJumpscaring = true;
 
         EnemyAI[] allEnemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
@@ -333,7 +419,7 @@ public class EnemyAI : MonoBehaviour
 
         if (agent != null)
         {
-            if (agent.isOnNavMesh)
+            if (agent.enabled && agent.isOnNavMesh)
             {
                 agent.isStopped = true;
                 agent.velocity = Vector3.zero;
