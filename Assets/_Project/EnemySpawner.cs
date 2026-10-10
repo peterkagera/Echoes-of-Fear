@@ -6,7 +6,7 @@ using UnityEngine.AI;
 public class EnemySpawner : MonoBehaviour
 {
     [Header("Spawn Configuration")]
-    public GameObject enemyPrefab;
+    public GameObject[] enemyPrefabs;
     public Transform playerTransform;
     public int totalEnemiesToSpawn = 10;
     public float spawnInterval = 3.0f;
@@ -72,12 +72,13 @@ public class EnemySpawner : MonoBehaviour
         {
             yield return new WaitForSeconds(spawnInterval + Random.Range(-0.5f, 0.5f));
 
-            if (enemyPrefab == null || playerTransform == null) continue;
+            if (enemyPrefabs == null || playerTransform == null) continue;
 
             Vector3 spawnPos = GetValidSpawnPosition();
             if (spawnPos != Vector3.zero)
             {
-                GameObject spawnedEnemy = Instantiate(enemyPrefab, spawnPos, Quaternion.identity, transform);
+                GameObject chosenPrefab = enemyPrefabs[Random.Range(0, enemyPrefabs.Length)];
+                GameObject spawnedEnemy = Instantiate(chosenPrefab, spawnPos, Quaternion.identity, transform);
                 if (spawnedEnemy == null) continue;
 
                 SetRenderersEnabled(spawnedEnemy, false);
@@ -156,6 +157,7 @@ public class EnemySpawner : MonoBehaviour
                 if (newPos != Vector3.zero)
                 {
                     NavMeshAgent agent = enemy.GetComponent<NavMeshAgent>();
+                    EnemyAI aiScript = enemy.GetComponent<EnemyAI>();
 
                     SetRenderersEnabled(enemy, false);
 
@@ -169,6 +171,12 @@ public class EnemySpawner : MonoBehaviour
                     {
                         enemy.transform.position = newPos;
                         SetRenderersEnabled(enemy, true);
+                    }
+
+                    // Re-trigger the stabilization delay when recycled
+                    if (aiScript != null)
+                    {
+                        aiScript.ResetSpawnDelay();
                     }
 
                     if (enableDiagnostics)

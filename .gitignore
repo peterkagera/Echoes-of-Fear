@@ -125,3 +125,8 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Third-party asset downloads and generated resources
+/Assets/infernal-magma-hound-free-lava-creature-asset/
+/Assets/infernal-magma-hound-free-lava-creature-asset.meta
+/Assets/Resources/

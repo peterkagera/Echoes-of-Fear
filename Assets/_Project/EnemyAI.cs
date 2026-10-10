@@ -15,7 +15,7 @@ public class EnemyAI : MonoBehaviour
     [Header("AI Settings")]
     public float moveSpeed = 3.5f;
     public float maxChaseDistance = 45f;
-    public float killDistance = 1.8f;
+    public float killDistance = 2.8f; // Optimized for quadruped jaw pivot points
     public float eyeLevelOffset = 1.6f;
     public float detectionRange = 12.0f;
     public float searchDuration = 5.0f;
@@ -40,6 +40,7 @@ public class EnemyAI : MonoBehaviour
     private float searchTimer = 0f;
     private bool isJumpscaring = false;
     private bool isStunned = false;
+    private bool isSpawning = true; // Locks movement and animation during spawn window
     private Coroutine stunRoutine;
 
     private float logTimer = 0f;
@@ -74,10 +75,10 @@ public class EnemyAI : MonoBehaviour
         if (agent != null)
         {
             agent.speed = moveSpeed;
-            agent.acceleration = 20f;
+            agent.acceleration = 30f;
             agent.angularSpeed = 360f;
-            agent.stoppingDistance = 0.8f;
-            agent.autoBraking = true;
+            agent.stoppingDistance = 0.1f;
+            agent.autoBraking = false;
         }
 
         footstepTimer = Random.Range(0f, footstepInterval);
@@ -109,17 +110,47 @@ public class EnemyAI : MonoBehaviour
             anim.Play(0, -1, Random.Range(0f, 1f));
         }
 
+        StartCoroutine(SpawnDelayRoutine());
         SetState(AIState.Dormant);
+    }
+
+    private IEnumerator SpawnDelayRoutine()
+    {
+        isSpawning = true;
+
+        if (agent != null && agent.enabled)
+        {
+            agent.isStopped = true;
+            agent.velocity = Vector3.zero;
+        }
+
+        if (anim != null)
+        {
+            anim.SetBool("isWalking", false);
+        }
+
+        // 2.5 second stabilization window to prevent running-in-place bugs
+        yield return new WaitForSeconds(2.5f);
+
+        isSpawning = false;
+
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = false;
+        }
+    }
+
+    public void ResetSpawnDelay()
+    {
+        StartCoroutine(SpawnDelayRoutine());
     }
 
     void Update()
     {
-        // I prevent any movement, state changes, or jumpscares if I am currently stunned or dead
-        if (player == null || isJumpscaring || isStunned) return;
+        if (player == null || isJumpscaring || isStunned || isSpawning) return;
 
         bool isMoving = agent != null && agent.enabled && agent.velocity.sqrMagnitude > 0.1f && !agent.isStopped;
 
-        // Optimized: Only call Animator set functions when the state changes
         if (anim != null && isMoving != lastWalkingState)
         {
             lastWalkingState = isMoving;
@@ -128,11 +159,13 @@ public class EnemyAI : MonoBehaviour
 
         if (isMoving && footstepSFX != null && footstepSFX.Length > 0)
         {
+            float currentSpeed = agent.velocity.magnitude;
+            float dynamicInterval = footstepInterval / Mathf.Max(1f, currentSpeed / 3.5f);
+
             footstepTimer += Time.deltaTime;
-            if (footstepTimer >= currentStepInterval)
+            if (footstepTimer >= dynamicInterval)
             {
                 footstepTimer = 0f;
-                currentStepInterval = footstepInterval + Random.Range(-0.06f, 0.06f);
                 AudioClip randomStep = footstepSFX[Random.Range(0, footstepSFX.Length)];
                 if (audioSource != null && randomStep != null && audioSource.enabled)
                 {
@@ -247,7 +280,7 @@ public class EnemyAI : MonoBehaviour
 
     public void AlertToSound(Vector3 soundPosition, float volume)
     {
-        if (isJumpscaring || isStunned || currentState == AIState.ChasingPlayer) return;
+        if (isJumpscaring || isStunned || isSpawning || currentState == AIState.ChasingPlayer) return;
 
         float distToSound = Vector3.Distance(transform.position, soundPosition);
         if (distToSound <= detectionRange * volume)
@@ -257,10 +290,9 @@ public class EnemyAI : MonoBehaviour
         }
     }
 
-    // I handle physical knockback forces applied by sonar waves
     public void ApplyKnockback(Vector3 force)
     {
-        if (isJumpscaring) return;
+        if (isJumpscaring || isSpawning) return;
 
         if (agent != null && agent.enabled)
         {
@@ -278,10 +310,9 @@ public class EnemyAI : MonoBehaviour
         }
     }
 
-    // I initiate the stun state and manage recovery timers
     public void Stun(float duration)
     {
-        if (isJumpscaring) return;
+        if (isJumpscaring || isSpawning) return;
 
         if (stunRoutine != null)
         {
@@ -325,7 +356,6 @@ public class EnemyAI : MonoBehaviour
             }
         }
 
-        // I default back to searching or chasing once recovery completes
         if (player != null && Vector3.SqrMagnitude(transform.position - player.position) <= detectionRangeSqr)
         {
             SetState(AIState.ChasingPlayer);
@@ -338,7 +368,7 @@ public class EnemyAI : MonoBehaviour
 
     public void SetTargetPosition(Vector3 targetPos)
     {
-        if (agent != null && agent.enabled && agent.isOnNavMesh)
+        if (agent != null && agent.enabled && agent.isOnNavMesh && !isSpawning)
         {
             agent.isStopped = false;
             agent.SetDestination(targetPos);
@@ -347,7 +377,7 @@ public class EnemyAI : MonoBehaviour
 
     public void SetState(AIState newState)
     {
-        if (isJumpscaring || isStunned || currentState == newState) return;
+        if (isJumpscaring || isStunned || isSpawning || currentState == newState) return;
 
         if (enableDiagnostics)
         {
@@ -387,7 +417,7 @@ public class EnemyAI : MonoBehaviour
 
     private void TriggerJumpscare()
     {
-        if (isJumpscaring || isStunned) return;
+        if (isJumpscaring || isStunned || isSpawning) return;
         isJumpscaring = true;
 
         EnemyAI[] allEnemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
@@ -402,13 +432,6 @@ public class EnemyAI : MonoBehaviour
         Vector3 directionToPlayer = (player.position - transform.position).normalized;
         directionToPlayer.y = 0;
         transform.rotation = Quaternion.LookRotation(directionToPlayer);
-
-        Vector3 targetKillPos = player.position - (directionToPlayer * killDistance);
-        if (Physics.Raycast(targetKillPos + Vector3.up * 2f, Vector3.down, out RaycastHit groundHit, 6f, ~0, QueryTriggerInteraction.Ignore))
-        {
-            targetKillPos.y = groundHit.point.y;
-        }
-        transform.position = targetKillPos;
 
         if (anim != null)
         {
