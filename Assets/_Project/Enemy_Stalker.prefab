@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 6819641265024838868}
   - component: {fileID: 2060690373059216428}
   - component: {fileID: 1036353007756156487}
+  - component: {fileID: -8356421972761361374}
   m_Layer: 7
   m_Name: Enemy_Stalker
   m_TagString: Untagged
@@ -107,7 +108,7 @@ MonoBehaviour:
   detectionRange: 15
   searchDuration: 5
   audioSource: {fileID: 6819641265024838868}
-  jumpscareSFX: {fileID: 8300000, guid: 81aac0eb965aadd459873da6b2257705, type: 3}
+  jumpscareSFX: {fileID: 8300000, guid: 13ee4eb814e730d4b9f075e496450de7, type: 3}
   jumpscareHoldDuration: 1
   footstepSFX:
   - {fileID: 8300000, guid: 188ef86ea3751534ea913e73ac74680f, type: 3}
@@ -259,6 +260,23 @@ Rigidbody:
   m_Interpolate: 0
   m_Constraints: 112
   m_CollisionDetection: 0
+--- !u!114 &-8356421972761361374
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6116151468943937275}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c277852714df9904b8dfb71aeea01471, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EnemyHealth
+  maxHealth: 100
+  currentHealth: 0
+  bloodVfxPrefab: {fileID: 8086314461076744572, guid: d8a3bd14b7eb0b04894e617225311e7a, type: 3}
+  animator: {fileID: 2060690373059216428}
+  enemyAiScript: {fileID: 4013032837400610468}
 --- !u!1001 &4688538270300807165
 PrefabInstance:
   m_ObjectHideFlags: 0

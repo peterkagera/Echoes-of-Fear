@@ -15,7 +15,7 @@ public class EnemyAI : MonoBehaviour
     [Header("AI Settings")]
     public float moveSpeed = 3.5f;
     public float maxChaseDistance = 45f;
-    public float killDistance = 2.8f; // Optimized for quadruped jaw pivot points
+    public float killDistance = 2.8f;
     public float eyeLevelOffset = 1.6f;
     public float detectionRange = 12.0f;
     public float searchDuration = 5.0f;
@@ -40,7 +40,7 @@ public class EnemyAI : MonoBehaviour
     private float searchTimer = 0f;
     private bool isJumpscaring = false;
     private bool isStunned = false;
-    private bool isSpawning = true; // Locks movement and animation during spawn window
+    private bool isSpawning = true;
     private Coroutine stunRoutine;
 
     private float logTimer = 0f;
@@ -48,13 +48,11 @@ public class EnemyAI : MonoBehaviour
     private float currentStepInterval;
     private float originalBasePitch = 1.0f;
 
-    // Cached squared distances to eliminate Sqrt calculations in Update()
     private float killDistanceSqr;
     private float detectionRangeSqr;
     private float maxChaseDistanceSqr;
-    private const float NEARBY_DETECTION_SQR = 25.0f; // 5.0f * 5.0f
+    private const float NEARBY_DETECTION_SQR = 25.0f;
 
-    // Performance Optimization Caches
     private bool lastWalkingState = false;
     private int walkableAreaMask;
 
@@ -114,7 +112,6 @@ public class EnemyAI : MonoBehaviour
         SetState(AIState.Dormant);
     }
 
-    // Trigger inception/jumpscare immediately upon physical contact with the player
     private void OnCollisionEnter(Collision collision)
     {
         if (collision.gameObject.CompareTag("Player") || (player != null && collision.transform.IsChildOf(player)))
@@ -146,7 +143,6 @@ public class EnemyAI : MonoBehaviour
             anim.SetBool("isWalking", false);
         }
 
-        // 2.5 second stabilization window to prevent running-in-place bugs
         yield return new WaitForSeconds(2.5f);
 
         isSpawning = false;
@@ -202,16 +198,6 @@ public class EnemyAI : MonoBehaviour
         float dx = enemyPos.x - playerPos.x;
         float dz = enemyPos.z - playerPos.z;
         float sqrDistToPlayer = (dx * dx) + (dz * dz);
-
-        if (enableDiagnostics)
-        {
-            logTimer += Time.deltaTime;
-            if (logTimer >= 2.0f)
-            {
-                logTimer = 0f;
-                Debug.Log($"[{gameObject.name}] State={currentState} | Dist={Mathf.Sqrt(sqrDistToPlayer):F1}m | Speed={(agent != null && agent.enabled ? agent.velocity.magnitude : 0f):F1}m/s | HasPath={(agent != null && agent.enabled && agent.hasPath)}", this);
-            }
-        }
 
         if (sqrDistToPlayer <= killDistanceSqr)
         {
@@ -396,11 +382,6 @@ public class EnemyAI : MonoBehaviour
     {
         if (isJumpscaring || isStunned || isSpawning || currentState == newState) return;
 
-        if (enableDiagnostics)
-        {
-            Debug.Log($"[{gameObject.name}] State Change: {currentState} -> {newState}", this);
-        }
-
         currentState = newState;
         if (agent != null && agent.enabled && agent.isOnNavMesh)
         {
@@ -437,29 +418,23 @@ public class EnemyAI : MonoBehaviour
         if (isJumpscaring || isStunned || isSpawning) return;
         isJumpscaring = true;
 
-        // Diagnostic check to see why inception didn't trigger
-        if (InceptionManager.Instance == null)
+        // PLAY THE MONSTER ATTACK JUMPSCARE SFX IMMEDIATELY
+        if (audioSource != null && jumpscareSFX != null)
         {
-            Debug.LogError("[EnemyAI] InceptionManager.Instance is NULL! Make sure InceptionManager is active in the scene.");
-        }
-        else
-        {
-            Debug.Log($"[EnemyAI] InceptionManager found. Current Layer: {InceptionManager.Instance.currentDreamLayer} / Max: {InceptionManager.Instance.maxDreamLayers}");
+            audioSource.enabled = true;
+            audioSource.PlayOneShot(jumpscareSFX);
         }
 
-        // Check if we can drop deeper into a dream layer instead of full game over
         if (InceptionManager.Instance != null && InceptionManager.Instance.currentDreamLayer < InceptionManager.Instance.maxDreamLayers)
         {
             InceptionManager.Instance.TriggerDreamCollapse();
 
-            // Reset enemy state so it backs off and lets the player wake up deeper
             isJumpscaring = false;
             SetState(AIState.Dormant);
             StartCoroutine(SpawnDelayRoutine());
             return;
         }
 
-        // Otherwise, execute full game over logic on max depth
         EnemyAI[] allEnemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
         foreach (EnemyAI enemy in allEnemies)
         {
