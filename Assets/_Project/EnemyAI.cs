@@ -114,6 +114,23 @@ public class EnemyAI : MonoBehaviour
         SetState(AIState.Dormant);
     }
 
+    // Trigger inception/jumpscare immediately upon physical contact with the player
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (collision.gameObject.CompareTag("Player") || (player != null && collision.transform.IsChildOf(player)))
+        {
+            TriggerJumpscare();
+        }
+    }
+
+    private void OnTriggerEnter(Collider other)
+    {
+        if (other.CompareTag("Player") || (player != null && other.transform.IsChildOf(player)))
+        {
+            TriggerJumpscare();
+        }
+    }
+
     private IEnumerator SpawnDelayRoutine()
     {
         isSpawning = true;
@@ -420,6 +437,29 @@ public class EnemyAI : MonoBehaviour
         if (isJumpscaring || isStunned || isSpawning) return;
         isJumpscaring = true;
 
+        // Diagnostic check to see why inception didn't trigger
+        if (InceptionManager.Instance == null)
+        {
+            Debug.LogError("[EnemyAI] InceptionManager.Instance is NULL! Make sure InceptionManager is active in the scene.");
+        }
+        else
+        {
+            Debug.Log($"[EnemyAI] InceptionManager found. Current Layer: {InceptionManager.Instance.currentDreamLayer} / Max: {InceptionManager.Instance.maxDreamLayers}");
+        }
+
+        // Check if we can drop deeper into a dream layer instead of full game over
+        if (InceptionManager.Instance != null && InceptionManager.Instance.currentDreamLayer < InceptionManager.Instance.maxDreamLayers)
+        {
+            InceptionManager.Instance.TriggerDreamCollapse();
+
+            // Reset enemy state so it backs off and lets the player wake up deeper
+            isJumpscaring = false;
+            SetState(AIState.Dormant);
+            StartCoroutine(SpawnDelayRoutine());
+            return;
+        }
+
+        // Otherwise, execute full game over logic on max depth
         EnemyAI[] allEnemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
         foreach (EnemyAI enemy in allEnemies)
         {
