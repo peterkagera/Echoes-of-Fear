@@ -7,6 +7,9 @@ public class EnemyAI : MonoBehaviour
 {
     public enum AIState { Dormant, ChasingPlayer, SearchingSound, Patrolling, Stunned }
 
+    [Header("Combat Settings")]
+    [SerializeField] private float attackDamage = 25f;
+
     [Header("References")]
     public Transform player;
     public LayerMask obstacleMask;
@@ -116,7 +119,7 @@ public class EnemyAI : MonoBehaviour
     {
         if (collision.gameObject.CompareTag("Player") || (player != null && collision.transform.IsChildOf(player)))
         {
-            TriggerJumpscare();
+            AttackPlayer(collision.collider);
         }
     }
 
@@ -124,7 +127,62 @@ public class EnemyAI : MonoBehaviour
     {
         if (other.CompareTag("Player") || (player != null && other.transform.IsChildOf(player)))
         {
-            TriggerJumpscare();
+            AttackPlayer(other);
+        }
+    }
+
+    private void AttackPlayer(Collider playerCollider)
+    {
+        if (isJumpscaring || isStunned || isSpawning) return;
+
+        Debug.Log("Enemy collided with: " + playerCollider.name);
+
+        // Try to find PlayerHealth on the player or collider
+        PlayerHealth playerHealth = playerCollider.GetComponent<PlayerHealth>();
+        if (playerHealth == null && player != null)
+        {
+            playerHealth = player.GetComponent<PlayerHealth>();
+        }
+
+        if (playerHealth != null)
+        {
+            Debug.Log("PlayerHealth found! Dealing damage: " + attackDamage);
+            playerHealth.TakeDamage(attackDamage);
+
+            if (audioSource != null && jumpscareSFX != null)
+            {
+                audioSource.enabled = true;
+                audioSource.PlayOneShot(jumpscareSFX);
+            }
+
+            if (playerHealth.CurrentHealth > 0f)
+            {
+                StartCoroutine(PostAttackCooldownRoutine());
+                return;
+            }
+        }
+        else
+        {
+            Debug.LogWarning("PlayerHealth component NOT found on player object!");
+        }
+
+        TriggerJumpscare();
+    }
+
+    private IEnumerator PostAttackCooldownRoutine()
+    {
+        isJumpscaring = true;
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = true;
+        }
+
+        yield return new WaitForSeconds(1.0f); // Short pause after landing a hit
+
+        isJumpscaring = false;
+        if (agent != null && agent.enabled && agent.isOnNavMesh)
+        {
+            agent.isStopped = false;
         }
     }
 
@@ -201,7 +259,7 @@ public class EnemyAI : MonoBehaviour
 
         if (sqrDistToPlayer <= killDistanceSqr)
         {
-            TriggerJumpscare();
+            AttackPlayer(player.GetComponent<Collider>() ?? player.GetComponentInChildren<Collider>());
             return;
         }
 
@@ -415,11 +473,10 @@ public class EnemyAI : MonoBehaviour
 
     private void TriggerJumpscare()
     {
-        if (isJumpscaring || isStunned || isSpawning) return;
+        if (isJumpscaring && isStunned) return;
         isJumpscaring = true;
 
-        // PLAY THE MONSTER ATTACK JUMPSCARE SFX IMMEDIATELY
-        if (audioSource != null && jumpscareSFX != null)
+        if (audioSource != null && jumpscareSFX != null && !audioSource.isPlaying)
         {
             audioSource.enabled = true;
             audioSource.PlayOneShot(jumpscareSFX);
@@ -429,13 +486,20 @@ public class EnemyAI : MonoBehaviour
         {
             InceptionManager.Instance.TriggerDreamCollapse();
 
+            // Reset player health on dream collapse so they get a fresh bar in the new layer
+            PlayerHealth pHealth = player != null ? player.GetComponent<PlayerHealth>() : FindAnyObjectByType<PlayerHealth>();
+            if (pHealth != null)
+            {
+                pHealth.Heal(pHealth.MaxHealth);
+            }
+
             isJumpscaring = false;
             SetState(AIState.Dormant);
             StartCoroutine(SpawnDelayRoutine());
             return;
         }
 
-        //Trigger the Game Over state, freeze time, and show the UI canvas
+        // Trigger the Game Over state, freeze time, and show the UI canvas
         GameOverManager gameOverManager = FindAnyObjectByType<GameOverManager>();
         if (gameOverManager != null)
         {
@@ -451,9 +515,12 @@ public class EnemyAI : MonoBehaviour
             }
         }
 
-        Vector3 directionToPlayer = (player.position - transform.position).normalized;
-        directionToPlayer.y = 0;
-        transform.rotation = Quaternion.LookRotation(directionToPlayer);
+        if (player != null)
+        {
+            Vector3 directionToPlayer = (player.position - transform.position).normalized;
+            directionToPlayer.y = 0;
+            transform.rotation = Quaternion.LookRotation(directionToPlayer);
+        }
 
         if (anim != null)
         {
@@ -473,7 +540,7 @@ public class EnemyAI : MonoBehaviour
             agent.enabled = false;
         }
 
-        if (JumpscareManager.Instance != null)
+        if (JumpscareManager.Instance != null && player != null)
         {
             JumpscareManager.Instance.TriggerJumpscare(transform, headTransform);
         }
