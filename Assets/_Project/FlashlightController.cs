@@ -17,6 +17,9 @@ public class FlashlightController : MonoBehaviour
     [SerializeField] private Slider batterySlider;
     [SerializeField] private TextMeshProUGUI batteryPercentText;
 
+    // State flag to block flashlight usage inside vehicles
+    public static bool IsInTukTuk { get; private set; } = false;
+
     public float CurrentBattery { get; private set; }
     public bool IsOn => isOn;
 
@@ -45,13 +48,16 @@ public class FlashlightController : MonoBehaviour
 
     private void Update()
     {
-        // 1. Direct PC Keyboard 'F' key tap listener
+        // 1. Block all input if inside the TukTuk
+        if (IsInTukTuk) return;
+
+        // 2. Direct PC Keyboard 'F' key tap listener
         if (Keyboard.current != null && Keyboard.current.fKey.wasPressedThisFrame)
         {
             ToggleFlashlight();
         }
 
-        // 2. Battery Drain logic while light is ON
+        // 3. Battery Drain logic while light is ON
         if (!isOn) return;
 
         if (CurrentBattery > 0f)
@@ -71,6 +77,8 @@ public class FlashlightController : MonoBehaviour
     // Called on single-tap of Mobile UI Button or PC 'F' Key
     public void ToggleFlashlight()
     {
+        if (IsInTukTuk) return;
+
         if (isOn)
         {
             TurnOff();
@@ -83,7 +91,7 @@ public class FlashlightController : MonoBehaviour
 
     public void TurnOn()
     {
-        if (CurrentBattery <= 0f) return;
+        if (IsInTukTuk || CurrentBattery <= 0f) return;
 
         isOn = true;
         if (flashlightSpot != null) flashlightSpot.enabled = true;
@@ -122,6 +130,16 @@ public class FlashlightController : MonoBehaviour
         }
 
         UpdateUI(true);
+    }
+
+    // whenever the player enters or exits the TukTuk
+    public static void SetInTukTuk(bool inTukTuk)
+    {
+        IsInTukTuk = inTukTuk;
+        if (inTukTuk && Instance != null)
+        {
+            Instance.TurnOff(); // Automatically turn off when entering
+        }
     }
 
     private void UpdateUI(bool force = false)

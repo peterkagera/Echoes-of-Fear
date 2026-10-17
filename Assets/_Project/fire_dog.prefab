@@ -1704,7 +1704,7 @@ MonoBehaviour:
   headTransform: {fileID: 1339543551072177016}
   moveSpeed: 7
   maxChaseDistance: 45
-  killDistance: 2.8
+  killDistance: 1.2
   eyeLevelOffset: 1.6
   detectionRange: 12
   searchDuration: 5

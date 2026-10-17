@@ -435,6 +435,13 @@ public class EnemyAI : MonoBehaviour
             return;
         }
 
+        //Trigger the Game Over state, freeze time, and show the UI canvas
+        GameOverManager gameOverManager = FindAnyObjectByType<GameOverManager>();
+        if (gameOverManager != null)
+        {
+            gameOverManager.ShowGameOver();
+        }
+
         EnemyAI[] allEnemies = FindObjectsByType<EnemyAI>(FindObjectsSortMode.None);
         foreach (EnemyAI enemy in allEnemies)
         {

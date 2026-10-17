@@ -107,18 +107,8 @@ public class SonarPingController : MonoBehaviour
     {
         if (KnifeWakeupItem.IsExecuting) return;
 
-        bool eKeyPressed = false;
-#if ENABLE_INPUT_SYSTEM
-        if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame)
-        {
-            eKeyPressed = true;
-        }
-#endif
-
-        if (eKeyPressed && !isPinging && !isFadingOut)
-        {
-            TriggerPing();
-        }
+        // REMOVED the hardcoded E key check here so collecting batteries doesn't trigger sonar.
+        // Sonar is now safely controlled entirely via code / TriggerPing().
 
         if (isPinging)
         {

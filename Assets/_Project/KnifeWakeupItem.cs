@@ -23,16 +23,17 @@ public class KnifeWakeupItem : MonoBehaviour
     public float fovKickAmount = 5f;
 
     [Header("Combat & Blood Settings")]
-    public Transform attackPoint; // Point at the tip of the knife blade
+    public Transform attackPoint;
     public float attackRange = 1.8f;
     public float attackDamage = 35f;
-    public LayerMask enemyLayer; // Set this to your Enemy layer
+    public LayerMask enemyLayer;
 
     // Public static flag so Sonar knows not to interrupt the knife sequence
     public static bool IsExecuting = false;
 
     private Renderer[] childRenderers;
     private int currentSlashIndex = 0;
+    private Coroutine activeWarpRoutine;
 
     void Awake()
     {
@@ -46,7 +47,7 @@ public class KnifeWakeupItem : MonoBehaviour
 
     void Update()
     {
-        if (Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame && !IsExecuting)
+        if (Keyboard.current != null && Keyboard.current.qKey.wasPressedThisFrame && !IsExecuting && !FlashlightController.IsInTukTuk)
         {
             AttemptSelfHarmWakeUp();
         }
@@ -54,7 +55,7 @@ public class KnifeWakeupItem : MonoBehaviour
 
     public void AttemptSelfHarmWakeUp()
     {
-        if (IsExecuting) return;
+        if (IsExecuting || FlashlightController.IsInTukTuk) return;
         StartCoroutine(ExecuteWakeUpSequence());
     }
 
@@ -74,6 +75,11 @@ public class KnifeWakeupItem : MonoBehaviour
             InceptionManager.Instance.WakeUpFromDream();
         }
 
+        // Cache true original camera transform once at the start of the sequence
+        Vector3 origPos = mainCamera.transform.localPosition;
+        Quaternion origRot = mainCamera.transform.localRotation;
+        float origFOV = mainCamera.fieldOfView;
+
         float startTime = Time.time;
 
         for (int i = 0; i < cutTimestamps.Length; i++)
@@ -88,10 +94,13 @@ public class KnifeWakeupItem : MonoBehaviour
 
             if (mainCamera != null)
             {
-                StartCoroutine(WarpCameraRoutine());
+                if (activeWarpRoutine != null)
+                {
+                    StopCoroutine(activeWarpRoutine);
+                }
+                activeWarpRoutine = StartCoroutine(WarpCameraRoutine(origPos, origRot, origFOV));
             }
 
-            // DEAL DAMAGE & TRIGGER BLOOD SPLATTER ON EACH SLASH TIMESTAMP
             PerformSlashDamage();
         }
 
@@ -99,6 +108,15 @@ public class KnifeWakeupItem : MonoBehaviour
         while (Time.time < endTime)
         {
             yield return null;
+        }
+
+        // Ensure camera snaps cleanly back to baseline when sequence completes
+        if (mainCamera != null)
+        {
+            if (activeWarpRoutine != null) StopCoroutine(activeWarpRoutine);
+            mainCamera.transform.localPosition = origPos;
+            mainCamera.transform.localRotation = origRot;
+            mainCamera.fieldOfView = origFOV;
         }
 
         SetMeshesVisible(false);
@@ -121,7 +139,6 @@ public class KnifeWakeupItem : MonoBehaviour
                 Vector3 hitPoint = enemyCol.ClosestPoint(attackPoint.position);
                 Vector3 hitNormal = (attackPoint.position - hitPoint).normalized;
 
-                // Safeguard against zero vector errors
                 if (hitNormal == Vector3.zero)
                 {
                     hitNormal = (mainCamera.transform.position - hitPoint).normalized;
@@ -154,12 +171,8 @@ public class KnifeWakeupItem : MonoBehaviour
         }
     }
 
-    private IEnumerator WarpCameraRoutine()
+    private IEnumerator WarpCameraRoutine(Vector3 origPos, Quaternion origRot, float origFOV)
     {
-        Vector3 origPos = mainCamera.transform.localPosition;
-        Quaternion origRot = mainCamera.transform.localRotation;
-        float origFOV = mainCamera.fieldOfView;
-
         float timer = 0f;
         while (timer < shakeDuration)
         {

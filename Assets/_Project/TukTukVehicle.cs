@@ -82,10 +82,8 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
     public string GetPrompt()
     {
-        // Runtime check: true on physical mobile devices
         bool isMobile = Application.isMobilePlatform;
 
-        // Check Editor Device Simulator state if testing on PC Editor
         if (playerMovementScript == null)
         {
             CachePlayerReferences();
@@ -155,11 +153,6 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
                 ExitVehicle();
                 return;
             }
-
-            if (Keyboard.current.fKey.wasPressedThisFrame)
-            {
-                TriggerSonarPulse();
-            }
         }
 #endif
     }
@@ -213,6 +206,17 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         ApplyMotor(0f);
         ApplyBrakes(brakeTorque);
         SetVehicleLights(false);
+
+        FlashlightController.SetInTukTuk(false);
+
+        if (playerObj != null)
+        {
+            Renderer[] playerRenderers = playerObj.GetComponentsInChildren<Renderer>(true);
+            foreach (Renderer r in playerRenderers)
+            {
+                if (r != null) r.enabled = true;
+            }
+        }
 
         if (audioSource != null && audioSource.isPlaying)
         {
@@ -297,26 +301,6 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         if (headlight != null) headlight.enabled = enable;
         if (pathLight != null) pathLight.enabled = enable;
         if (cabLight != null) cabLight.enabled = enable;
-    }
-
-    private void TriggerSonarPulse()
-    {
-        if (headlight != null)
-        {
-            headlight.intensity *= 2.5f;
-            CancelInvoke(nameof(ResetHeadlight));
-            Invoke(nameof(ResetHeadlight), 0.3f);
-        }
-
-        if (sonarController != null)
-        {
-            sonarController.TriggerPing();
-        }
-    }
-
-    private void ResetHeadlight()
-    {
-        if (headlight != null) headlight.intensity = 3f;
     }
 
     private void AlertNearbyEnemies(Vector3 soundPosition, float radius)
@@ -414,6 +398,15 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         SetVehicleLights(true);
         if (audioSource != null) audioSource.Play();
         isDriving = true;
+
+        FlashlightController.SetInTukTuk(true);
+
+        // Hide all renderers/arms while inside the vehicle
+        Renderer[] playerRenderers = playerObj.GetComponentsInChildren<Renderer>(true);
+        foreach (Renderer r in playerRenderers)
+        {
+            if (r != null) r.enabled = false;
+        }
     }
 
     public void ExitVehicle()
@@ -429,6 +422,8 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
         SetVehicleLights(false);
         if (audioSource != null) audioSource.Stop();
 
+        FlashlightController.SetInTukTuk(false);
+
         if (playerObj != null)
         {
             Transform exitAnchor = exitPoint != null ? exitPoint : transform;
@@ -437,6 +432,13 @@ public class TukTukVehicle : MonoBehaviour, IInteractable
 
             if (playerCollider != null) playerCollider.enabled = true;
             if (playerMovementScript != null) playerMovementScript.ExitVehicle();
+
+            // Restore all renderers/arms when exiting the vehicle
+            Renderer[] playerRenderers = playerObj.GetComponentsInChildren<Renderer>(true);
+            foreach (Renderer r in playerRenderers)
+            {
+                if (r != null) r.enabled = true;
+            }
         }
     }
 }

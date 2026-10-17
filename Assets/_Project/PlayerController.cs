@@ -15,7 +15,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private GameObject mobileInteractButton;
 
     [Header("Editor Testing Toggles")]
-    [Tooltip("Check this to force mobile joysticks active in Editor regardless of active view window.")]
     [SerializeField] private bool enableMobileInEditor = false;
 
     [Header("Movement Settings")]
@@ -23,19 +22,13 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float gravity = -15.0f;
 
     [Header("Touch / Joystick Look Settings")]
-    [Tooltip("Rotation speed in degrees per second when using touch joysticks.")]
     [SerializeField] private float joystickLookSpeed = 75.0f;
-    [Tooltip("Look acceleration response power (higher = finer control in center).")]
     [SerializeField] private float lookExponent = 1.5f;
-    [Tooltip("Smoothing factor for touch camera rotation.")]
     [SerializeField] private float lookSmoothing = 25.0f;
 
     [Header("PC Mouse Look Settings")]
-    [Tooltip("Sensitivity multiplier for PC Mouse look.")]
     [SerializeField] private float mouseSensitivity = 0.15f;
-    [Tooltip("Enable smooth mouse look filtering.")]
     [SerializeField] private bool smoothMouseLook = true;
-    [Tooltip("Smoothing speed for PC mouse look (higher = faster response).")]
     [SerializeField] private float mouseSmoothing = 30.0f;
 
     [Header("Footstep Settings")]
@@ -46,11 +39,9 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Transform cameraTransform;
 
     [Header("Sonar Integration")]
-    [Tooltip("Optional reference to your Sonar component/script. If left blank, it will automatically search for it on player and camera.")]
     [SerializeField] private MonoBehaviour sonarController;
 
     [Header("Flashlight Settings")]
-    [Tooltip("Direct reference to the FlashlightController script on the FlashLight GameObject.")]
     [SerializeField] private FlashlightController flashlightController;
     [SerializeField] private Light flashlightComponent;
 
@@ -69,6 +60,10 @@ public class PlayerController : MonoBehaviour
     private bool isJoystickMoving = false;
     private TukTukVehicle targetTukTuk;
     private PlayerInteractor playerInteractor;
+
+    // Guard timer to prevent sonar from firing immediately after an interaction/pickup
+    private static float interactionCooldown = 0f;
+
     public bool IsMobileActive => isMobileActive;
     public Vector2 MoveInput => rawMoveInput;
     public Vector2 LookInput => rawLookInput;
@@ -103,12 +98,26 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
+        // Decrement interaction guard timer
+        if (interactionCooldown > 0f)
+        {
+            interactionCooldown -= Time.deltaTime;
+        }
+
 #if UNITY_EDITOR
         UpdateEditorControlMode();
 #endif
 
         HandleMobileMovementInput();
         HandleLook();
+
+        // Check PC Sonar Key (R) directly and safely
+#if ENABLE_INPUT_SYSTEM
+        if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame)
+        {
+            OnSonarButtonPressed();
+        }
+#endif
 
         if (!isDriving)
         {
@@ -118,7 +127,6 @@ public class PlayerController : MonoBehaviour
         {
             HandleVehicleMovement();
 
-            // Keep Exit button visible while driving on mobile
             if (isMobileActive && mobileInteractButton != null && !mobileInteractButton.activeSelf)
             {
                 mobileInteractButton.SetActive(true);
@@ -221,6 +229,14 @@ public class PlayerController : MonoBehaviour
         if (context.started)
         {
             OnInteractButtonPressed();
+        }
+    }
+
+    public void OnSonar(InputAction.CallbackContext context)
+    {
+        if (context.started)
+        {
+            OnSonarButtonPressed();
         }
     }
 
@@ -348,9 +364,10 @@ public class PlayerController : MonoBehaviour
         }
     }
 
-    // Called via Mobile UI Button OnClick() or OnInteract Action
     public void OnInteractButtonPressed()
     {
+        // Trigger interaction cooldown to block simultaneous sonar calls
+        interactionCooldown = 0.4f;
         SuppressAndCancelSonar();
 
         if (isDriving)
@@ -362,12 +379,10 @@ public class PlayerController : MonoBehaviour
 
             if (targetTukTuk != null)
             {
-                // Attempt standard vehicle exit trigger
                 targetTukTuk.Interact();
             }
             else
             {
-                // Direct fallback exit if target reference lost
                 ExitVehicle();
             }
         }
@@ -428,7 +443,11 @@ public class PlayerController : MonoBehaviour
             playerInteractor.enabled = false;
         }
 
-        // Clear and hide HUD interaction text when entering vehicle
+        if (sonarController != null && sonarController is Behaviour sonarBehaviour)
+        {
+            sonarBehaviour.enabled = false;
+        }
+
         GameObject interactionTextObj = GameObject.Find("InteractionText");
         if (interactionTextObj != null)
         {
@@ -462,6 +481,11 @@ public class PlayerController : MonoBehaviour
         if (playerInteractor != null)
         {
             playerInteractor.enabled = true;
+        }
+
+        if (sonarController != null && sonarController is Behaviour sonarBehaviour)
+        {
+            sonarBehaviour.enabled = true;
         }
     }
 
@@ -500,16 +524,18 @@ public class PlayerController : MonoBehaviour
         Cursor.visible = false;
     }
 
-    // Called via Mobile UI SonarButton OnClick()
     public void OnSonarButtonPressed()
     {
+        //Debug.LogWarning("Sonar triggered by: " + new System.Diagnostics.StackTrace());
+        // Block sonar if driving or if an interaction/pickup was just triggered
+        if (isDriving || interactionCooldown > 0f) return;
+
         if (sonarController != null)
         {
             sonarController.SendMessage("TriggerPing", SendMessageOptions.DontRequireReceiver);
         }
         else
         {
-            // Fallback search if sonarController reference wasn't assigned in Inspector
             var sonar = FindAnyObjectByType<SonarPingController>();
             if (sonar != null)
             {
